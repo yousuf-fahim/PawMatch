@@ -38,7 +38,7 @@ export default function SplashScreen() {
             <View style={styles.logoCircle}>
               <Heart size={60} color="white" fill="white" />
             </View>
-            <Text style={styles.appName}>PawMatch</Text>
+            <Text style={styles.appName}>Pawfect Match</Text>
             <Text style={styles.tagline}>Find your perfect furry friend</Text>
           </View>
 

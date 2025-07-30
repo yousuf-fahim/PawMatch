@@ -1,3 +1,4 @@
+import React from 'react';
 import { View, Text, Image, StyleSheet, Dimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MapPin, Heart, Calendar, Info } from 'lucide-react-native';
@@ -9,6 +10,9 @@ import Animated, {
   runOnJS,
   interpolate,
   withSpring,
+  withRepeat,
+  withTiming,
+  Easing,
 } from 'react-native-reanimated';
 import { PanGestureHandler } from 'react-native-gesture-handler';
 
@@ -40,10 +44,22 @@ export default function PetCard({ pet, onSwipeLeft, onSwipeRight, onPress }: Pet
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
   const scale = useSharedValue(1);
+  const shimmer = useSharedValue(0);
+  const pressed = useSharedValue(0);
+
+  // Start shimmer animation
+  React.useEffect(() => {
+    shimmer.value = withRepeat(
+      withTiming(1, { duration: 2000, easing: Easing.linear }),
+      -1,
+      false
+    );
+  }, []);
 
   const gestureHandler = useAnimatedGestureHandler({
     onStart: () => {
       scale.value = withSpring(0.95);
+      pressed.value = withSpring(1);
     },
     onActive: (event) => {
       translateX.value = event.translationX;
@@ -51,6 +67,7 @@ export default function PetCard({ pet, onSwipeLeft, onSwipeRight, onPress }: Pet
     },
     onEnd: (event) => {
       scale.value = withSpring(1);
+      pressed.value = withSpring(0);
       
       if (Math.abs(event.translationX) > 100) {
         translateX.value = withSpring(event.translationX > 0 ? 1000 : -1000);
@@ -89,6 +106,25 @@ export default function PetCard({ pet, onSwipeLeft, onSwipeRight, onPress }: Pet
         { rotate: `${rotation}deg` },
       ],
       opacity,
+    };
+  });
+
+  const shimmerBorderStyle = useAnimatedStyle(() => {
+    const translateX = interpolate(
+      shimmer.value,
+      [0, 1],
+      [-100, CARD_WIDTH + 100]
+    );
+
+    const pressIntensity = interpolate(
+      pressed.value,
+      [0, 1],
+      [0.3, 0.8]
+    );
+
+    return {
+      transform: [{ translateX }],
+      opacity: pressIntensity,
     };
   });
 
@@ -133,6 +169,18 @@ export default function PetCard({ pet, onSwipeLeft, onSwipeRight, onPress }: Pet
   return (
     <PanGestureHandler onGestureEvent={gestureHandler}>
       <Animated.View style={[styles.card, animatedStyle]}>
+        {/* Shimmer Border Effect */}
+        <View style={styles.shimmerContainer}>
+          <Animated.View style={[styles.shimmerBorderContainer, shimmerBorderStyle]}>
+            <LinearGradient
+              colors={['transparent', 'rgba(255,255,255,0.4)', 'rgba(255,255,255,0.8)', 'rgba(255,255,255,0.4)', 'transparent']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.shimmerBorder}
+            />
+          </Animated.View>
+        </View>
+        
         <TouchableOpacity style={styles.cardContent} onPress={onPress} activeOpacity={0.9}>
           <Image source={{ uri: pet.image }} style={styles.image} />
           
@@ -192,12 +240,39 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 20,
     elevation: 10,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  shimmerContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 20,
+    overflow: 'hidden',
+    zIndex: 1,
+    pointerEvents: 'none',
+  },
+  shimmerBorder: {
+    position: 'absolute',
+    top: -2,
+    bottom: -2,
+    width: 100,
+    borderRadius: 20,
+  },
+  shimmerBorderContainer: {
+    position: 'absolute',
+    top: -2,
+    bottom: -2,
+    width: 100,
   },
   cardContent: {
     flex: 1,
     borderRadius: 20,
     overflow: 'hidden',
     position: 'relative',
+    zIndex: 2,
   },
   image: {
     width: '100%',

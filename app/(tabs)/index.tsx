@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import { TouchableOpacity } from 'react-native-gesture-handler';
 import { X, Heart, Filter, Settings } from 'lucide-react-native';
 import PetCard, { Pet } from '@/components/PetCard';
+import AnimatedButton from '@/components/AnimatedButton';
+import AnimatedLoader from '@/components/AnimatedLoader';
 import { mockPets } from '@/data/pets';
 
 const { width, height } = Dimensions.get('window');
@@ -37,6 +39,12 @@ export default function HomeScreen() {
     if (currentIndex >= pets.length) {
       return (
         <View style={styles.noMoreCards}>
+          <AnimatedLoader 
+            variant="paws" 
+            text="Finding more paw-fect matches..." 
+            color="#FF6B6B"
+            size="large"
+          />
           <Text style={styles.noMoreText}>No more pets to discover!</Text>
           <Text style={styles.noMoreSubtext}>Check back later for more adorable pets</Text>
         </View>
@@ -99,12 +107,19 @@ export default function HomeScreen() {
       </View>
 
       <View style={styles.actionButtons}>
-        <TouchableOpacity style={styles.passButton} onPress={handleSwipeLeft}>
-          <X size={30} color="#FF6B6B" />
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.likeButton} onPress={handleSwipeRight}>
-          <Heart size={30} color="white" />
-        </TouchableOpacity>
+        <AnimatedButton 
+          title="Pass" 
+          onPress={handleSwipeLeft}
+          variant="secondary"
+          size="medium"
+        />
+        <AnimatedButton 
+          title="Like" 
+          onPress={handleSwipeRight}
+          variant="love"
+          size="large"
+          icon="heart"
+        />
       </View>
     </SafeAreaView>
   );

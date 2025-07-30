@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { Heart, MapPin, Bookmark, User } from 'lucide-react-native';
+import { Heart, MapPin, Bookmark, User, BookOpen } from 'lucide-react-native';
 
 export default function TabLayout() {
   return (
@@ -49,6 +49,15 @@ export default function TabLayout() {
           title: 'Pet Shops',
           tabBarIcon: ({ size, color }) => (
             <MapPin size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="learn"
+        options={{
+          title: 'Learn',
+          tabBarIcon: ({ size, color }) => (
+            <BookOpen size={size} color={color} />
           ),
         }}
       />

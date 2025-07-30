@@ -48,7 +48,7 @@ export default function AuthScreen() {
             {isLogin ? 'Welcome Back!' : 'Create Account'}
           </Text>
           <Text style={styles.subtitle}>
-            {isLogin ? 'Sign in to continue' : 'Join PawMatch today'}
+            {isLogin ? 'Sign in to continue' : 'Join Pawfect Match today'}
           </Text>
 
           <Formik
@@ -98,7 +98,7 @@ export default function AuthScreen() {
                   <Text style={styles.errorText}>{errors.password}</Text>
                 )}
 
-                <TouchableOpacity style={styles.authButton} onPress={handleSubmit}>
+                <TouchableOpacity style={styles.authButton} onPress={() => handleSubmit()}>
                   <Text style={styles.authButtonText}>
                     {isLogin ? 'Sign In' : 'Create Account'}
                   </Text>
