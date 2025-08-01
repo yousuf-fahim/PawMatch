@@ -2,6 +2,7 @@ import { View, Text, StyleSheet, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState, useEffect } from 'react';
 import { TouchableOpacity } from 'react-native-gesture-handler';
+import { useRouter } from 'expo-router';
 import { X, Heart, Filter, Settings } from 'lucide-react-native';
 import PetCard, { Pet } from '@/components/PetCard';
 import AnimatedButton from '@/components/AnimatedButton';
@@ -11,6 +12,7 @@ import { mockPets } from '@/data/pets';
 const { width, height } = Dimensions.get('window');
 
 export default function HomeScreen() {
+  const router = useRouter();
   const [pets, setPets] = useState<Pet[]>(mockPets);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [likedPets, setLikedPets] = useState<string[]>([]);
@@ -31,8 +33,8 @@ export default function HomeScreen() {
   };
 
   const handleCardPress = () => {
-    // Navigate to pet details
-    console.log('Show pet details');
+    const currentPet = pets[currentIndex];
+    router.push(`/pet/${currentPet.id}` as any);
   };
 
   const renderCards = () => {

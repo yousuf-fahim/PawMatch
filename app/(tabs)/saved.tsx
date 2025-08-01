@@ -1,11 +1,17 @@
 import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { Heart, MapPin, MessageCircle, Share2 } from 'lucide-react-native';
 import { mockPets } from '@/data/pets';
 
 export default function SavedScreen() {
+  const router = useRouter();
   // Mock saved pets (first 3 pets)
   const savedPets = mockPets.slice(0, 3);
+
+  const handlePetPress = (petId: string) => {
+    router.push(`/pet/${petId}` as any);
+  };
 
   const handleMessage = (petId: string) => {
     console.log('Message pet owner:', petId);
@@ -16,8 +22,8 @@ export default function SavedScreen() {
   };
 
   const renderPetItem = ({ item }: { item: typeof mockPets[0] }) => (
-    <View style={styles.petCard}>
-      <Image source={{ uri: item.image }} style={styles.petImage} />
+    <TouchableOpacity style={styles.petCard} onPress={() => handlePetPress(item.id)}>
+      <Image source={{ uri: Array.isArray(item.image) ? item.image[0] : item.image }} style={styles.petImage} />
       <View style={styles.petInfo}>
         <View style={styles.petHeader}>
           <Text style={styles.petName}>{item.name}</Text>
@@ -40,20 +46,26 @@ export default function SavedScreen() {
         <View style={styles.actionButtons}>
           <TouchableOpacity 
             style={styles.messageButton}
-            onPress={() => handleMessage(item.id)}
+            onPress={(e) => {
+              e.stopPropagation();
+              handleMessage(item.id);
+            }}
           >
             <MessageCircle size={16} color="white" />
             <Text style={styles.messageButtonText}>Message</Text>
           </TouchableOpacity>
           <TouchableOpacity 
             style={styles.shareButton}
-            onPress={() => handleShare(item.id)}
+            onPress={(e) => {
+              e.stopPropagation();
+              handleShare(item.id);
+            }}
           >
             <Share2 size={16} color="#FF6B6B" />
           </TouchableOpacity>
         </View>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 
   return (

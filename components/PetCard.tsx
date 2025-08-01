@@ -182,7 +182,7 @@ export default function PetCard({ pet, onSwipeLeft, onSwipeRight, onPress }: Pet
         </View>
         
         <TouchableOpacity style={styles.cardContent} onPress={onPress} activeOpacity={0.9}>
-          <Image source={{ uri: pet.image }} style={styles.image} />
+          <Image source={{ uri: Array.isArray(pet.image) ? pet.image[0] : pet.image }} style={styles.image} />
           
           <Animated.View style={[styles.likeIndicator, likeIndicatorStyle]}>
             <Heart size={40} color="#4CAF50" fill="#4CAF50" />

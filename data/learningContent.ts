@@ -1,7 +1,7 @@
 export interface LearningArticle {
   id: string;
   title: string;
-  category: 'basic-care' | 'training' | 'health' | 'breed-guide' | 'emergency';
+  category: 'basic-care' | 'training' | 'health' | 'breed-guide' | 'emergency' | 'pet-services';
   difficulty: 'beginner' | 'intermediate' | 'advanced';
   estimatedReadTime: number; // in minutes
   content: string;
@@ -65,6 +65,14 @@ export const learningCategories: LearningCategory[] = [
     icon: 'AlertTriangle', // Lucide AlertTriangle icon
     color: '#FECA57',
     articleCount: 6,
+  },
+  {
+    id: 'pet-services',
+    name: 'Pet Services & Shops',
+    description: 'Find local pet services and shops',
+    icon: 'MapPin', // Lucide MapPin icon
+    color: '#9013FE',
+    articleCount: 2,
   },
 ];
 
@@ -985,6 +993,160 @@ Being prepared and knowing these basic techniques can make a crucial difference 
     createdAt: new Date('2023-12-20'),
     likes: 445,
     views: 2800,
+  },
+  {
+    id: '10',
+    title: 'Finding the Right Veterinarian for Your Pet',
+    category: 'pet-services',
+    difficulty: 'beginner',
+    estimatedReadTime: 6,
+    content: `# Finding the Right Veterinarian for Your Pet
+
+Choosing the right veterinarian is one of the most important decisions you'll make as a pet owner. A good vet will be your partner in keeping your pet healthy throughout their life.
+
+## What to Look For
+
+### Qualifications and Experience
+- **Board certification** from accredited veterinary schools
+- **Years of experience** with your type of pet
+- **Continuing education** and specializations
+- **Professional memberships** in veterinary associations
+
+### Clinic Facilities
+- **Clean, modern facilities** with up-to-date equipment
+- **Emergency capabilities** or partnerships with emergency clinics
+- **On-site laboratory** for quick test results
+- **Separate areas** for different types of animals
+
+### Communication Style
+- **Patient and thorough** explanations of treatments
+- **Willingness to answer questions** without rushing
+- **Clear pricing** and treatment options
+- **Comfortable handling** of your pet
+
+## Questions to Ask
+
+Before choosing a veterinarian, consider asking:
+
+1. **What are your hours and emergency policies?**
+2. **What is your approach to preventive care?**
+3. **How do you handle payment and insurance?**
+4. **Can you provide references from other pet owners?**
+5. **What is your experience with my pet's breed?**
+
+## Red Flags to Avoid
+
+- **Unwillingness to show facilities** or answer questions
+- **Pressure to buy expensive treatments** immediately
+- **Lack of clear pricing** or hidden fees
+- **Poor handling** of animals or unsanitary conditions
+- **No emergency coverage** or referral system
+
+## Building a Relationship
+
+Once you've chosen a vet:
+- **Schedule regular check-ups** as recommended
+- **Keep detailed records** of your pet's health
+- **Be honest about your budget** and concerns
+- **Follow through** with recommended treatments
+- **Provide feedback** about your experience
+
+Remember, a good veterinarian should make both you and your pet feel comfortable and well-cared for.`,
+    summary: 'Learn how to choose the best veterinarian for your pet, what questions to ask, and red flags to avoid when selecting veterinary care.',
+    tags: ['veterinarian', 'pet care', 'health', 'services', 'choosing vet'],
+    author: 'Dr. Sarah Johnson, DVM',
+    featuredImage: 'https://images.pexels.com/photos/6235234/pexels-photo-6235234.jpeg?auto=compress&cs=tinysrgb&w=800',
+    createdAt: new Date('2024-01-10'),
+    likes: 234,
+    views: 1456,
+  },
+  {
+    id: '11',
+    title: 'Complete Guide to Pet Grooming Services',
+    category: 'pet-services',
+    difficulty: 'beginner',
+    estimatedReadTime: 8,
+    content: `# Complete Guide to Pet Grooming Services
+
+Regular grooming is essential for your pet's health and happiness. While some grooming can be done at home, professional services offer expertise and specialized care.
+
+## Types of Grooming Services
+
+### Basic Grooming Package
+- **Bath and dry** with professional shampoos
+- **Nail trimming** to appropriate length
+- **Ear cleaning** to prevent infections
+- **Basic brushing** to remove loose fur
+
+### Full-Service Grooming
+- **Complete coat care** including cuts and styling
+- **Dental cleaning** (basic)
+- **Anal gland expression** (if needed)
+- **Flea and tick treatments**
+- **Specialized skin treatments**
+
+### Breed-Specific Services
+- **Show cuts** for specific breeds
+- **Breed-standard grooming** techniques
+- **Specialized coat treatments** for double coats
+- **Hand-stripping** for wire-haired breeds
+
+## What to Expect
+
+### First Visit
+1. **Consultation** about your pet's needs
+2. **Health assessment** before grooming begins
+3. **Discussion of services** and pricing
+4. **Timeline** for completion
+
+### During the Service
+- **Gentle handling** techniques
+- **Regular breaks** for anxious pets
+- **Use of proper restraints** for safety
+- **Monitoring** for stress or health issues
+
+## Choosing a Groomer
+
+### Important Qualifications
+- **Professional training** or certification
+- **Experience** with your pet's breed
+- **Clean, safe facilities** with proper equipment
+- **Good references** from other pet owners
+
+### Questions to Ask
+1. **How do you handle anxious pets?**
+2. **What products do you use?**
+3. **How long will the grooming take?**
+4. **What is included in each service?**
+5. **Do you have experience with my pet's breed?**
+
+## Grooming Schedule
+
+### Dogs
+- **Short-haired breeds**: Every 6-12 weeks
+- **Long-haired breeds**: Every 4-6 weeks
+- **High-maintenance breeds**: Every 4 weeks
+
+### Cats
+- **Short-haired**: Every 8-12 weeks
+- **Long-haired**: Every 4-6 weeks
+- **Senior cats**: More frequent as needed
+
+## Home Care Between Visits
+
+- **Regular brushing** as recommended
+- **Nail checks** and basic trimming
+- **Ear cleaning** with vet-approved solutions
+- **Dental care** with appropriate products
+
+Professional grooming not only keeps your pet looking great but also helps maintain their health and comfort.`,
+    summary: 'Everything you need to know about professional pet grooming services, from choosing the right groomer to understanding different service packages.',
+    tags: ['grooming', 'pet care', 'services', 'hygiene', 'professional care'],
+    author: 'Lisa Martinez, Certified Pet Groomer',
+    featuredImage: 'https://images.pexels.com/photos/6568461/pexels-photo-6568461.jpeg?auto=compress&cs=tinysrgb&w=800',
+    createdAt: new Date('2024-01-08'),
+    likes: 189,
+    views: 1122,
   },
 ];
 

@@ -1,55 +1,74 @@
 import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { User, Settings, Heart, Plus, MapPin, Phone, Mail, Calendar, CreditCard as Edit3 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
 export default function ProfileScreen() {
+  const router = useRouter();
+  
   const userPets = [
     {
       id: '1',
-      name: 'Buddy',
-      breed: 'Golden Retriever',
-      age: '2 years',
-      image: 'https://images.pexels.com/photos/1108099/pexels-photo-1108099.jpeg?auto=compress&cs=tinysrgb&w=300',
+      name: 'Peu',
+      breed: 'Persian',
+      age: '1 year',
+      image: 'https://i.postimg.cc/rwPDrn80/Peu.jpg',
     },
   ];
+
+  const handleEditProfile = () => {
+    router.push('/profile/edit' as any);
+  };
+
+  const handleAddPet = () => {
+    router.push('/profile/add-pet' as any);
+  };
+
+  const handleEditPet = (petId: string) => {
+    router.push(`/profile/pet/${petId}` as any);
+  };
+
+  const handleViewPet = (petId: string) => {
+    router.push(`/pet/${petId}` as any);
+  };
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false}>
         <LinearGradient
-          colors={['#FF6B6B', '#FF8E8E']}
+          colors={['#2E3192', '#1BFFFF']}
           style={styles.headerGradient}
         >
           <View style={styles.profileHeader}>
             <View style={styles.avatarContainer}>
               <Image
-                source={{ uri: 'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=300' }}
+                source={{ uri: 'https://i.postimg.cc/NjFjx6M3/fahim.jpg' }}
                 style={styles.avatar}
               />
-              <TouchableOpacity style={styles.editButton}>
+              <TouchableOpacity style={styles.editButton} onPress={handleEditProfile}>
                 <Edit3 size={16} color="white" />
               </TouchableOpacity>
             </View>
-            <Text style={styles.userName}>Sarah Johnson</Text>
-            <Text style={styles.userLocation}>San Francisco, CA</Text>
+            <Text style={styles.userName}>Yousuf Fahim</Text>
+            <Text style={styles.userLocation}>Mirpur, Dhaka</Text>
           </View>
         </LinearGradient>
 
         <View style={styles.content}>
           <View style={styles.statsContainer}>
             <View style={styles.statItem}>
-              <Heart size={24} color="#FF6B6B" />
+              <Heart size={24} color="#60c4fdff" />
               <Text style={styles.statNumber}>23</Text>
               <Text style={styles.statLabel}>Liked</Text>
             </View>
             <View style={styles.statItem}>
-              <User size={24} color="#FF6B6B" />
+              <User size={24} color="#60c4fdff" />
               <Text style={styles.statNumber}>1</Text>
               <Text style={styles.statLabel}>My Pets</Text>
             </View>
             <View style={styles.statItem}>
-              <MapPin size={24} color="#FF6B6B" />
+              <MapPin size={24} color="#60c4fdff" />
               <Text style={styles.statNumber}>5</Text>
               <Text style={styles.statLabel}>Nearby</Text>
             </View>
@@ -58,22 +77,28 @@ export default function ProfileScreen() {
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>My Pets</Text>
-              <TouchableOpacity style={styles.addButton}>
-                <Plus size={20} color="#FF6B6B" />
+              <TouchableOpacity style={styles.addButton} onPress={handleAddPet}>
+                <Plus size={20} color="#60c4fdff" />
               </TouchableOpacity>
             </View>
             
             {userPets.map((pet) => (
-              <View key={pet.id} style={styles.petCard}>
-                <Image source={{ uri: pet.image }} style={styles.petImage} />
+              <TouchableOpacity key={pet.id} style={styles.petCard} onPress={() => handleViewPet(pet.id)}>
+                <Image source={{ uri: Array.isArray(pet.image) ? pet.image[0] : pet.image }} style={styles.petImage} />
                 <View style={styles.petInfo}>
                   <Text style={styles.petName}>{pet.name}</Text>
                   <Text style={styles.petDetails}>{pet.breed} • {pet.age}</Text>
                 </View>
-                <TouchableOpacity style={styles.editPetButton}>
+                <TouchableOpacity 
+                  style={styles.editPetButton} 
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    handleEditPet(pet.id);
+                  }}
+                >
                   <Edit3 size={16} color="#666" />
                 </TouchableOpacity>
-              </View>
+              </TouchableOpacity>
             ))}
           </View>
 
@@ -81,15 +106,15 @@ export default function ProfileScreen() {
             <Text style={styles.sectionTitle}>Contact Information</Text>
             <View style={styles.contactItem}>
               <Phone size={20} color="#666" />
-              <Text style={styles.contactText}>+1 (555) 123-4567</Text>
+              <Text style={styles.contactText}>+880 1706-561532</Text>
             </View>
             <View style={styles.contactItem}>
               <Mail size={20} color="#666" />
-              <Text style={styles.contactText}>sarah.johnson@email.com</Text>
+              <Text style={styles.contactText}>yousuf.fahim@email.com</Text>
             </View>
             <View style={styles.contactItem}>
               <Calendar size={20} color="#666" />
-              <Text style={styles.contactText}>Member since March 2024</Text>
+              <Text style={styles.contactText}>Member since March 2025</Text>
             </View>
           </View>
 

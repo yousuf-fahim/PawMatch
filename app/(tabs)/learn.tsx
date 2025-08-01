@@ -1,6 +1,7 @@
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState } from 'react';
+import { useRouter } from 'expo-router';
 import { 
   Search, 
   Clock, 
@@ -12,10 +13,11 @@ import {
   GraduationCap,
   Stethoscope,
   AlertTriangle,
+  MapPin,
   Bot,
   LucideIcon
 } from 'lucide-react-native';
-import { learningCategories, mockLearningArticles, getFeaturedArticles, getPopularArticles } from '@/data/learningContent';
+import { learningCategories, mockLearningArticles, getFeaturedArticles } from '@/data/learningContent';
 import { LinearGradient } from 'expo-linear-gradient';
 import AnimatedButton from '@/components/AnimatedButton';
 
@@ -26,12 +28,17 @@ const iconMap: Record<string, LucideIcon> = {
   Stethoscope: Stethoscope,
   BookOpen: BookOpen,
   AlertTriangle: AlertTriangle,
+  MapPin: MapPin,
 };
 
 export default function LearnScreen() {
   const [searchQuery, setSearchQuery] = useState('');
+  const router = useRouter();
   const featuredArticles = getFeaturedArticles();
-  const popularArticles = getPopularArticles();
+  
+  // Filter out pet-services from main categories - it will have its own section
+  const mainCategories = learningCategories.filter(category => category.id !== 'pet-services');
+  const petServicesCategory = learningCategories.find(category => category.id === 'pet-services');
 
   const handleCategoryPress = (categoryId: string) => {
     console.log('Navigate to category:', categoryId);
@@ -39,8 +46,7 @@ export default function LearnScreen() {
   };
 
   const handleArticlePress = (articleId: string) => {
-    console.log('Navigate to article:', articleId);
-    // TODO: Navigate to article detail screen
+    router.push(`/learn/article/${articleId}` as any);
   };
 
   const renderCategoryCard = (category: typeof learningCategories[0]) => {
@@ -162,20 +168,8 @@ export default function LearnScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Explore Topics</Text>
           <View style={styles.categoriesContainer}>
-            {learningCategories.map(renderCategoryCard)}
+            {mainCategories.map(renderCategoryCard)}
           </View>
-        </View>
-
-        {/* Popular Articles */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Popular This Week</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalScroll}>
-            {popularArticles.map(article => (
-              <View key={article.id} style={styles.horizontalArticle}>
-                {renderArticleCard(article)}
-              </View>
-            ))}
-          </ScrollView>
         </View>
 
         {/* Recent Articles */}
@@ -204,6 +198,40 @@ export default function LearnScreen() {
           ))}
         </View>
 
+        {/* Pet Services Section */}
+        <View style={styles.section}>
+          <View style={styles.petServicesCard}>
+            <LinearGradient
+              colors={['#9013FE', '#6C1CE7']}
+              style={styles.petServicesGradient}
+            >
+              <View style={styles.petServicesContent}>
+                <View style={styles.petServicesIconContainer}>
+                  <MapPin size={32} color="white" strokeWidth={2} />
+                </View>
+                <View style={styles.petServicesInfo}>
+                  <Text style={styles.petServicesTitle}>Pet Services</Text>
+                  <Text style={styles.petServicesDescription}>
+                    Find trusted veterinarians, groomers, and pet shops near you
+                  </Text>
+                  <Text style={styles.petServicesCount}>
+                    {petServicesCategory?.articleCount} helpful guides available
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.petServicesButtonContainer}>
+                <AnimatedButton 
+                  title="Explore Services" 
+                  onPress={() => handleCategoryPress('pet-services')}
+                  variant="secondary"
+                  size="medium"
+                  icon="map-pin"
+                />
+              </View>
+            </LinearGradient>
+          </View>
+        </View>
+
         {/* AI Assistant Teaser */}
         <View style={styles.section}>
           <View style={styles.aiAssistantCard}>
@@ -213,23 +241,23 @@ export default function LearnScreen() {
             >
               <View style={styles.aiAssistantContent}>
                 <View style={styles.aiAssistantIconContainer}>
-                  <Bot size={28} color="white" strokeWidth={2} />
+                  <Bot size={32} color="white" strokeWidth={2} />
                 </View>
                 <View style={styles.aiAssistantInfo}>
                   <Text style={styles.aiAssistantTitle}>AI Pet Counselor</Text>
                   <Text style={styles.aiAssistantDescription}>
-                    Get instant answers to your pet care questions
+                    Get expert veterinary advice 24/7. Ask about health, behavior, training, and emergency care.
                   </Text>
-                  <View style={styles.aiButtonContainer}>
-                    <AnimatedButton 
-                      title="Ask AI Assistant" 
-                      onPress={() => console.log('AI Assistant pressed')}
-                      variant="ai"
-                      size="medium"
-                      icon="bot"
-                    />
-                  </View>
                 </View>
+              </View>
+              <View style={styles.aiButtonContainer}>
+                <AnimatedButton 
+                  title="Chat with AI Vet" 
+                  onPress={() => console.log('AI Assistant pressed')}
+                  variant="secondary"
+                  size="medium"
+                  icon="bot"
+                />
               </View>
             </LinearGradient>
           </View>
@@ -431,13 +459,6 @@ const styles = StyleSheet.create({
     fontFamily: 'Nunito-Regular',
     color: 'rgba(255, 255, 255, 0.8)',
   },
-  horizontalScroll: {
-    marginHorizontal: -20,
-    paddingHorizontal: 20,
-  },
-  horizontalArticle: {
-    marginRight: 16,
-  },
   recentArticle: {
     flexDirection: 'row',
     backgroundColor: 'white',
@@ -483,44 +504,46 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   aiAssistantCard: {
-    borderRadius: 16,
+    borderRadius: 20,
     overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 8,
+    marginBottom: 8,
   },
   aiAssistantGradient: {
-    padding: 20,
+    padding: 24,
   },
   aiAssistantContent: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: 16,
   },
   aiAssistantIconContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    width: 64,
+    height: 64,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 16,
+    marginRight: 20,
   },
   aiAssistantInfo: {
     flex: 1,
   },
   aiAssistantTitle: {
-    fontSize: 20,
+    fontSize: 24,
     fontFamily: 'Poppins-Bold',
     color: 'white',
-    marginBottom: 4,
+    marginBottom: 6,
   },
   aiAssistantDescription: {
-    fontSize: 14,
+    fontSize: 16,
     fontFamily: 'Nunito-Regular',
-    color: 'rgba(255, 255, 255, 0.9)',
-    marginBottom: 8,
+    color: 'rgba(255, 255, 255, 0.95)',
+    lineHeight: 22,
   },
   aiAssistantCta: {
     fontSize: 14,
@@ -528,6 +551,56 @@ const styles = StyleSheet.create({
     color: 'white',
   },
   aiButtonContainer: {
-    marginTop: 12,
+    alignItems: 'flex-start',
+  },
+  petServicesCard: {
+    borderRadius: 20,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  petServicesGradient: {
+    padding: 24,
+  },
+  petServicesContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  petServicesIconContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 20,
+  },
+  petServicesInfo: {
+    flex: 1,
+  },
+  petServicesTitle: {
+    fontSize: 24,
+    fontFamily: 'Poppins-Bold',
+    color: 'white',
+    marginBottom: 6,
+  },
+  petServicesDescription: {
+    fontSize: 16,
+    fontFamily: 'Nunito-Regular',
+    color: 'rgba(255, 255, 255, 0.95)',
+    lineHeight: 22,
+    marginBottom: 4,
+  },
+  petServicesCount: {
+    fontSize: 14,
+    fontFamily: 'Nunito-SemiBold',
+    color: 'rgba(255, 255, 255, 0.9)',
+  },
+  petServicesButtonContainer: {
+    alignItems: 'flex-start',
   },
 });

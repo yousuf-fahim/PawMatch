@@ -1,7 +1,7 @@
 import React from 'react';
 import { Text, StyleSheet, Pressable } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Heart, Bot, LucideIcon } from 'lucide-react-native';
+import { Heart, Bot, MapPin, LucideIcon } from 'lucide-react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -16,7 +16,7 @@ interface AnimatedButtonProps {
   variant?: 'primary' | 'secondary' | 'ai' | 'love';
   size?: 'small' | 'medium' | 'large';
   disabled?: boolean;
-  icon?: 'heart' | 'bot' | 'none';
+  icon?: 'heart' | 'bot' | 'map-pin' | 'none';
 }
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -103,6 +103,8 @@ export default function AnimatedButton({
         return <Heart size={iconSize} color={iconColor} fill={iconColor} style={{ marginRight: 8 }} />;
       case 'bot':
         return <Bot size={iconSize} color={iconColor} style={{ marginRight: 8 }} />;
+      case 'map-pin':
+        return <MapPin size={iconSize} color={iconColor} style={{ marginRight: 8 }} />;
       default:
         return null;
     }
