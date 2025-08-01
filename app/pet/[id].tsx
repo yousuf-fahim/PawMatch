@@ -22,10 +22,13 @@ import AnimatedButton from '@/components/AnimatedButton';
 const { width } = Dimensions.get('window');
 
 export default function PetDetailScreen() {
-  const { id } = useLocalSearchParams();
+  const { id, owner } = useLocalSearchParams();
   const router = useRouter();
   const [isFavorited, setIsFavorited] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  
+  // Check if this is the user's own pet
+  const isOwnerView = owner === 'true';
 
   // Find the pet by ID
   const pet = mockPets.find(p => p.id === id);
@@ -245,7 +248,58 @@ export default function PetDetailScreen() {
             </View>
           </View>
 
-        
+          {/* Action Buttons - Only show for non-owner pets */}
+          {!isOwnerView && (
+            <View style={styles.actionContainer}>
+              <View style={styles.secondaryActions}>
+                <TouchableOpacity style={styles.secondaryButton} onPress={handleContact}>
+                  <MessageCircle size={20} color="#FF6B6B" />
+                  <Text style={styles.secondaryButtonText}>Message</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.secondaryButton} onPress={handleContact}>
+                  <Phone size={20} color="#FF6B6B" />
+                  <Text style={styles.secondaryButtonText}>Call</Text>
+                </TouchableOpacity>
+              </View>
+              
+              <LinearGradient
+                colors={['#FF6B6B', '#FF8E8E']}
+                style={styles.adoptButton}
+              >
+                <TouchableOpacity style={styles.adoptButtonInner} onPress={handleAdopt}>
+                  <Text style={styles.adoptButtonText}>Adopt {pet.name}</Text>
+                  <Heart size={20} color="white" fill="white" />
+                </TouchableOpacity>
+              </LinearGradient>
+            </View>
+          )}
+
+          {/* Owner Actions - Only show for owner pets */}
+          {isOwnerView && (
+            <View style={styles.actionContainer}>
+              <View style={styles.secondaryActions}>
+                <TouchableOpacity style={styles.secondaryButton} onPress={() => router.push(`/profile/pet/${pet.id}/edit` as any)}>
+                  <MessageCircle size={20} color="#FF6B6B" />
+                  <Text style={styles.secondaryButtonText}>Edit Info</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.secondaryButton} onPress={() => console.log('Share pet')}>
+                  <Phone size={20} color="#FF6B6B" />
+                  <Text style={styles.secondaryButtonText}>Share</Text>
+                </TouchableOpacity>
+              </View>
+              
+              <LinearGradient
+                colors={['#4CAF50', '#66BB6A']}
+                style={styles.adoptButton}
+              >
+                <TouchableOpacity style={styles.adoptButtonInner} onPress={() => console.log('View health records')}>
+                  <Text style={styles.adoptButtonText}>Health Records</Text>
+                  <Heart size={20} color="white" fill="white" />
+                </TouchableOpacity>
+              </LinearGradient>
+            </View>
+          )}
+
         </View>
       </ScrollView>
     </SafeAreaView>

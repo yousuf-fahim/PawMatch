@@ -46,18 +46,12 @@ export default function PetCard({ pet, onSwipeLeft, onSwipeRight, onPress }: Pet
   const scale = useSharedValue(1);
   const shimmer = useSharedValue(0);
   const pressed = useSharedValue(0);
-  const [imageLoaded, setImageLoaded] = React.useState(false);
-  const [imageError, setImageError] = React.useState(false);
-
-  const imageUri = Array.isArray(pet.image) ? pet.image[0] : pet.image;
 
   // Debug logging  
   console.log('PetCard rendering:', {
     id: pet.id,
     name: pet.name,
-    imageUri: imageUri,
-    imageLoaded,
-    imageError
+    image: Array.isArray(pet.image) ? pet.image[0] : pet.image
   });
 
   // Start shimmer animation
@@ -117,54 +111,67 @@ export default function PetCard({ pet, onSwipeLeft, onSwipeRight, onPress }: Pet
       transform: [
         { translateX: translateX.value },
         { translateY: translateY.value },
-        { rotateZ: `${rotation}deg` },
         { scale: scale.value },
+        { rotate: `${rotation}deg` },
       ],
       opacity,
+    };
+  });
+
+  const shimmerBorderStyle = useAnimatedStyle(() => {
+    const translateX = interpolate(
+      shimmer.value,
+      [0, 1],
+      [-100, CARD_WIDTH + 100]
+    );
+
+    const pressIntensity = interpolate(
+      pressed.value,
+      [0, 1],
+      [0.3, 0.8]
+    );
+
+    return {
+      transform: [{ translateX }],
+      opacity: pressIntensity,
     };
   });
 
   const likeIndicatorStyle = useAnimatedStyle(() => {
     const opacity = interpolate(
       translateX.value,
-      [0, 100],
-      [0, 1]
+      [0, 50, 100],
+      [0, 0.5, 1]
+    );
+    
+    const scale = interpolate(
+      translateX.value,
+      [0, 50, 100],
+      [0.8, 1, 1.2]
     );
 
     return {
       opacity,
-      transform: [{ scale: opacity }],
+      transform: [{ scale }],
     };
   });
 
   const passIndicatorStyle = useAnimatedStyle(() => {
     const opacity = interpolate(
       translateX.value,
-      [-100, 0],
-      [1, 0]
+      [0, -50, -100],
+      [0, 0.5, 1]
+    );
+    
+    const scale = interpolate(
+      translateX.value,
+      [0, -50, -100],
+      [0.8, 1, 1.2]
     );
 
     return {
       opacity,
-      transform: [{ scale: opacity }],
-    };
-  });
-
-  const shimmerBorderStyle = useAnimatedStyle(() => {
-    return {
-      transform: [{ translateX: interpolate(shimmer.value, [0, 1], [-100, CARD_WIDTH + 100]) }],
-    };
-  });
-
-  const pressedStyle = useAnimatedStyle(() => {
-    const opacity = interpolate(
-      pressed.value,
-      [0, 1],
-      [0, 0.1]
-    );
-
-    return {
-      opacity,
+      transform: [{ scale }],
     };
   });
 
@@ -184,39 +191,12 @@ export default function PetCard({ pet, onSwipeLeft, onSwipeRight, onPress }: Pet
         </View>
         
         <TouchableOpacity style={styles.cardContent} onPress={onPress} activeOpacity={0.9}>
-          {/* Image with loading state and error handling */}
-          <View style={styles.imageContainer}>
-            {!imageLoaded && !imageError && (
-              <View style={styles.imagePlaceholder}>
-                <Text style={styles.placeholderText}>Loading...</Text>
-              </View>
-            )}
-            
-            {imageError && (
-              <View style={[styles.imagePlaceholder, styles.errorPlaceholder]}>
-                <Text style={styles.errorText}>Image not available</Text>
-                <Text style={styles.errorSubtext}>for {pet.name}</Text>
-              </View>
-            )}
-            
-            <Image 
-              source={{ uri: imageUri }} 
-              style={[
-                styles.image,
-                { opacity: imageLoaded && !imageError ? 1 : 0 }
-              ]}
-              onLoad={() => {
-                console.log('Image loaded successfully for pet:', pet.name);
-                setImageLoaded(true);
-                setImageError(false);
-              }}
-              onError={(error) => {
-                console.log('Image failed to load for pet:', pet.name, error.nativeEvent.error);
-                setImageError(true);
-                setImageLoaded(false);
-              }}
-            />
-          </View>
+          <Image 
+            source={{ uri: Array.isArray(pet.image) ? pet.image[0] : pet.image }} 
+            style={styles.image}
+            onLoad={() => console.log('Image loaded successfully for pet:', pet.name)}
+            onError={(error) => console.log('Image failed to load for pet:', pet.name, error.nativeEvent.error)}
+          />
           
           <Animated.View style={[styles.likeIndicator, likeIndicatorStyle]}>
             <Heart size={40} color="#4CAF50" fill="#4CAF50" />
@@ -254,12 +234,9 @@ export default function PetCard({ pet, onSwipeLeft, onSwipeRight, onPress }: Pet
             </View>
           </LinearGradient>
           
-          <TouchableOpacity style={styles.infoButton}>
+          <TouchableOpacity style={styles.infoButton} onPress={onPress}>
             <Info size={20} color="white" />
           </TouchableOpacity>
-          
-          {/* Pressed overlay effect */}
-          <Animated.View style={[styles.pressedOverlay, pressedStyle]} />
         </TouchableOpacity>
       </Animated.View>
     </PanGestureHandler>
@@ -303,7 +280,6 @@ const styles = StyleSheet.create({
     top: -2,
     bottom: -2,
     width: 100,
-    overflow: 'hidden',
   },
   cardContent: {
     flex: 1,
@@ -418,51 +394,5 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.3)',
     padding: 8,
     borderRadius: 20,
-  },
-  pressedOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'black',
-    borderRadius: 20,
-  },
-  imageContainer: {
-    width: '100%',
-    height: '100%',
-    position: 'relative',
-  },
-  imagePlaceholder: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: '#f0f0f0',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: 20,
-  },
-  errorPlaceholder: {
-    backgroundColor: '#ffebee',
-  },
-  placeholderText: {
-    fontSize: 16,
-    fontFamily: 'Nunito-Regular',
-    color: '#666',
-  },
-  errorText: {
-    fontSize: 16,
-    fontFamily: 'Nunito-SemiBold',
-    color: '#d32f2f',
-    textAlign: 'center',
-  },
-  errorSubtext: {
-    fontSize: 14,
-    fontFamily: 'Nunito-Regular',
-    color: '#d32f2f',
-    textAlign: 'center',
-    marginTop: 4,
   },
 });

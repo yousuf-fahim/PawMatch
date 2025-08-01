@@ -30,14 +30,14 @@ export default function ProfileScreen() {
   };
 
   const handleViewPet = (petId: string) => {
-    router.push(`/pet/${petId}` as any);
+    router.push(`/pet/${petId}?owner=true` as any);
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false}>
         <LinearGradient
-          colors={['#2E3192', '#1BFFFF']}
+          colors={['#FF6F61', '#D32F2F']}
           style={styles.headerGradient}
         >
           <View style={styles.profileHeader}>
@@ -58,17 +58,17 @@ export default function ProfileScreen() {
         <View style={styles.content}>
           <View style={styles.statsContainer}>
             <View style={styles.statItem}>
-              <Heart size={24} color="#60c4fdff" />
+              <Heart size={24} color="#FF6F61" />
               <Text style={styles.statNumber}>23</Text>
               <Text style={styles.statLabel}>Liked</Text>
             </View>
             <View style={styles.statItem}>
-              <User size={24} color="#60c4fdff" />
+              <User size={24} color="#FF6F61" />
               <Text style={styles.statNumber}>1</Text>
               <Text style={styles.statLabel}>My Pets</Text>
             </View>
             <View style={styles.statItem}>
-              <MapPin size={24} color="#60c4fdff" />
+              <MapPin size={24} color="#FF6F61" />
               <Text style={styles.statNumber}>5</Text>
               <Text style={styles.statLabel}>Nearby</Text>
             </View>
@@ -78,7 +78,7 @@ export default function ProfileScreen() {
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>My Pets</Text>
               <TouchableOpacity style={styles.addButton} onPress={handleAddPet}>
-                <Plus size={20} color="#60c4fdff" />
+                <Plus size={20} color="#FF6F61" />
               </TouchableOpacity>
             </View>
             

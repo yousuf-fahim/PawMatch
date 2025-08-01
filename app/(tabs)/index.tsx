@@ -1,93 +1,64 @@
-import { View, Text, StyleSheet, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, Dimensions, Image, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useState, useEffect } from 'react';
-import { TouchableOpacity } from 'react-native-gesture-handler';
+import { useState } from 'react';
 import { useRouter } from 'expo-router';
-import { X, Heart, Filter, Settings } from 'lucide-react-native';
-import PetCard, { Pet } from '@/components/PetCard';
-import AnimatedButton from '@/components/AnimatedButton';
-import AnimatedLoader from '@/components/AnimatedLoader';
+import { Filter, Settings, Heart, X } from 'lucide-react-native';
 import { mockPets } from '@/data/pets';
 
 const { width, height } = Dimensions.get('window');
 
 export default function HomeScreen() {
   const router = useRouter();
-  const [pets, setPets] = useState<Pet[]>(mockPets);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [likedPets, setLikedPets] = useState<string[]>([]);
 
-  const handleSwipeLeft = () => {
-    if (currentIndex < pets.length - 1) {
-      setCurrentIndex(currentIndex + 1);
+  const currentPet = mockPets[currentIndex];
+
+  const handleLike = () => {
+    if (currentPet) {
+      setLikedPets(prev => [...prev, currentPet.id]);
+      console.log('Liked pet:', currentPet.name);
+    }
+    nextPet();
+  };
+
+  const handlePass = () => {
+    console.log('Passed on pet:', currentPet?.name);
+    nextPet();
+  };
+
+  const nextPet = () => {
+    if (currentIndex < mockPets.length - 1) {
+      setCurrentIndex(prev => prev + 1);
     }
   };
 
-  const handleSwipeRight = () => {
-    const currentPet = pets[currentIndex];
-    setLikedPets([...likedPets, currentPet.id]);
-    
-    if (currentIndex < pets.length - 1) {
-      setCurrentIndex(currentIndex + 1);
-    }
-  };
-
-  const handleCardPress = () => {
-    const currentPet = pets[currentIndex];
-    router.push(`/pet/${currentPet.id}` as any);
-  };
-
-  const renderCards = () => {
-    if (currentIndex >= pets.length) {
+  const renderPetCard = () => {
+    if (!currentPet) {
       return (
         <View style={styles.noMoreCards}>
-          <AnimatedLoader 
-            variant="paws" 
-            text="Finding more paw-fect matches..." 
-            color="#FF6B6B"
-            size="large"
-          />
           <Text style={styles.noMoreText}>No more pets to discover!</Text>
           <Text style={styles.noMoreSubtext}>Check back later for more adorable pets</Text>
         </View>
       );
     }
 
-    const cards = [];
-    for (let i = Math.min(currentIndex + 2, pets.length - 1); i >= currentIndex; i--) {
-      const isTop = i === currentIndex;
-      const translateY = (i - currentIndex) * 10;
-      const scale = 1 - (i - currentIndex) * 0.05;
-      
-      cards.push(
-        <View
-          key={pets[i].id}
-          style={[
-            styles.cardContainer,
-            {
-              transform: [{ translateY }, { scale }],
-              zIndex: pets.length - i,
-            },
-          ]}
-        >
-          {isTop && (
-            <PetCard
-              pet={pets[i]}
-              onSwipeLeft={handleSwipeLeft}
-              onSwipeRight={handleSwipeRight}
-              onPress={handleCardPress}
-            />
-          )}
-          {!isTop && (
-            <View style={styles.backgroundCard}>
-              <Text style={styles.backgroundCardText}>{pets[i].name}</Text>
-            </View>
-          )}
+    return (
+      <View style={styles.petCard}>
+        <Image 
+          source={{ uri: currentPet.image as string }} 
+          style={styles.petImage}
+          onError={() => console.log('Image failed to load for:', currentPet.name)}
+          onLoad={() => console.log('Image loaded for:', currentPet.name)}
+        />
+        <View style={styles.petInfo}>
+          <Text style={styles.petName}>{currentPet.name}</Text>
+          <Text style={styles.petDetails}>{currentPet.breed} • {currentPet.age}</Text>
+          <Text style={styles.petLocation}>{currentPet.location}</Text>
+          <Text style={styles.petDescription}>{currentPet.description}</Text>
         </View>
-      );
-    }
-    
-    return cards;
+      </View>
+    );
   };
 
   return (
@@ -104,25 +75,20 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      <View style={styles.cardStack}>
-        {renderCards()}
+      <View style={styles.cardContainer}>
+        {renderPetCard()}
       </View>
 
-      <View style={styles.actionButtons}>
-        <AnimatedButton 
-          title="Pass" 
-          onPress={handleSwipeLeft}
-          variant="secondary"
-          size="medium"
-        />
-        <AnimatedButton 
-          title="Like" 
-          onPress={handleSwipeRight}
-          variant="love"
-          size="large"
-          icon="heart"
-        />
-      </View>
+      {currentPet && (
+        <View style={styles.actionButtons}>
+          <TouchableOpacity style={styles.passButton} onPress={handlePass}>
+            <X size={30} color="#FFF" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.likeButton} onPress={handleLike}>
+            <Heart size={30} color="#FFF" />
+          </TouchableOpacity>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -151,26 +117,57 @@ const styles = StyleSheet.create({
   headerButton: {
     padding: 8,
   },
-  cardStack: {
+  cardContainer: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: 20,
   },
-  cardContainer: {
-    position: 'absolute',
-  },
-  backgroundCard: {
+  petCard: {
     width: width - 40,
-    height: height * 0.7,
-    backgroundColor: '#E0E0E0',
+    height: height * 0.65,
+    backgroundColor: 'white',
     borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.1,
+    shadowRadius: 20,
+    elevation: 10,
+    overflow: 'hidden',
   },
-  backgroundCardText: {
+  petImage: {
+    width: '100%',
+    height: '70%',
+    resizeMode: 'cover',
+  },
+  petInfo: {
+    flex: 1,
+    padding: 20,
+    justifyContent: 'space-between',
+  },
+  petName: {
     fontSize: 24,
-    fontFamily: 'Poppins-SemiBold',
+    fontFamily: 'Poppins-Bold',
+    color: '#333',
+    marginBottom: 5,
+  },
+  petDetails: {
+    fontSize: 16,
+    fontFamily: 'Nunito-Medium',
+    color: '#666',
+    marginBottom: 5,
+  },
+  petLocation: {
+    fontSize: 14,
+    fontFamily: 'Nunito-Regular',
     color: '#999',
+    marginBottom: 10,
+  },
+  petDescription: {
+    fontSize: 14,
+    fontFamily: 'Nunito-Regular',
+    color: '#666',
+    lineHeight: 20,
   },
   noMoreCards: {
     alignItems: 'center',
@@ -201,26 +198,26 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: 'white',
+    backgroundColor: '#FF6B6B',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
+    shadowColor: '#FF6B6B',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.3,
     shadowRadius: 8,
-    elevation: 5,
+    elevation: 8,
   },
   likeButton: {
     width: 70,
     height: 70,
     borderRadius: 35,
-    backgroundColor: '#FF6B6B',
+    backgroundColor: '#4ECDC4',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
+    shadowColor: '#4ECDC4',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.3,
     shadowRadius: 8,
-    elevation: 5,
+    elevation: 8,
   },
 });
