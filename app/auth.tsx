@@ -48,7 +48,7 @@ export default function AuthScreen() {
             {isLogin ? 'Welcome Back!' : 'Create Account'}
           </Text>
           <Text style={styles.subtitle}>
-            {isLogin ? 'Sign in to continue' : 'Join Pawfect Match today'}
+            {isLogin ? 'Sign in to continue' : 'Join PawMatch today'}
           </Text>
 
           <Formik

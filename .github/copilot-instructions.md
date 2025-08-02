@@ -1,7 +1,7 @@
 # PawMatch: AI Agent Development Guide
 
 ## Project Overview
-PawMatch (internally "Pawfect Match") is an Expo React Native pet adoption app using TypeScript. The app facilitates pet discovery through swipeable cards, comprehensive learning resources, and location-based services for connecting potential adopters with pets and pet shops.
+PawMatch is an Expo React Native pet adoption app using TypeScript. The app facilitates pet discovery through swipeable cards, comprehensive learning resources, and location-based services for connecting potential adopters with pets and pet shops.
 
 ## 🎯 CURRENT DEVELOPMENT PLAN
 
