@@ -1,8 +1,8 @@
 import { View, Text, StyleSheet, Dimensions, Image, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'expo-router';
-import { Filter, Settings, Heart, X, MapPin, Star } from 'lucide-react-native';
+import { Filter, Bell, Heart, X, MapPin, Star } from 'lucide-react-native';
 import { PanGestureHandler } from 'react-native-gesture-handler';
 import Animated, {
   useAnimatedGestureHandler,
@@ -16,6 +16,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { mockPets } from '@/data/pets';
+import FilterModal, { Filters } from '@/components/FilterModal';
 
 const { width, height } = Dimensions.get('window');
 const CARD_WIDTH = width - 30;
@@ -27,6 +28,14 @@ export default function HomeScreen() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [likedPets, setLikedPets] = useState<string[]>([]);
   const [isAnimating, setIsAnimating] = useState(false);
+  const [showFilterModal, setShowFilterModal] = useState(false);
+  const [filters, setFilters] = useState<Filters>({
+    breed: 'All Breeds',
+    age: 'All Ages',
+    size: 'All Sizes',
+    distance: 'Any Distance'
+  });
+  const [filteredPets, setFilteredPets] = useState(mockPets);
   
   // Double buffer: maintain two separate card states
   const [cardAData, setCardAData] = useState(0); // Index for card A
@@ -44,11 +53,62 @@ export default function HomeScreen() {
   const cardBOpacity = useSharedValue(0);
 
   // Safe access to pets with error handling - using double buffer
-  const totalPets = mockPets?.length || 0;
+  const totalPets = filteredPets?.length || 0;
   
   // Get the current active pet based on which card is active
   const currentPetIndex = activeCard === 'A' ? cardAData : cardBData;
-  const currentPet = totalPets > 0 ? mockPets[currentPetIndex % totalPets] : null;
+  const currentPet = totalPets > 0 ? filteredPets[currentPetIndex % totalPets] : null;
+
+  // Apply filters when they change
+  useEffect(() => {
+    applyFilters(filters);
+  }, [filters]);
+
+  // Filter pets based on selected criteria
+  const applyFilters = (newFilters: Filters) => {
+    let filtered = [...mockPets];
+    
+    // Apply breed filter
+    if (newFilters.breed !== 'All Breeds') {
+      filtered = filtered.filter(pet => pet.breed === newFilters.breed);
+    }
+    
+    // Apply age filter
+    if (newFilters.age !== 'All Ages') {
+      filtered = filtered.filter(pet => {
+        const petAge = pet.age.toLowerCase();
+        const filterAge = newFilters.age.toLowerCase();
+        
+        if (filterAge.includes('puppy') || filterAge.includes('kitten')) {
+          return petAge.includes('month') || petAge.includes('puppy') || petAge.includes('kitten');
+        }
+        if (filterAge.includes('young')) {
+          return petAge.includes('1') || petAge.includes('2') || petAge.includes('3');
+        }
+        if (filterAge.includes('adult')) {
+          return petAge.includes('4') || petAge.includes('5') || petAge.includes('6') || petAge.includes('7');
+        }
+        if (filterAge.includes('senior')) {
+          return petAge.includes('8') || petAge.includes('9') || petAge.includes('10') || petAge.includes('senior');
+        }
+        return true;
+      });
+    }
+    
+    // Apply size filter
+    if (newFilters.size !== 'All Sizes') {
+      filtered = filtered.filter(pet => pet.size === newFilters.size);
+    }
+    
+    setFilteredPets(filtered);
+    
+    // Reset card positions when filters change
+    setCardAData(0);
+    setCardBData(1);
+    setActiveCard('A');
+    cardAOpacity.value = 1;
+    cardBOpacity.value = 0;
+  };
 
   const handleLike = () => {
     if (currentPet) {
@@ -337,11 +397,9 @@ export default function HomeScreen() {
       <View style={styles.header}>
         <Text style={styles.title}>Discover</Text>
         <View style={styles.headerButtons}>
-          <TouchableOpacity style={styles.headerButton}>
-            <Filter size={24} color="#FF6B6B" />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.headerButton}>
-            <Settings size={24} color="#FF6B6B" />
+          
+          <TouchableOpacity style={styles.headerButton} onPress={() => router.push('/notifications')}>
+            <Bell size={24} color="#FF6B6B" />
           </TouchableOpacity>
         </View>
       </View>
@@ -361,7 +419,7 @@ export default function HomeScreen() {
                   key="card-a"
                   style={[styles.cardWrapper, cardAAnimatedStyle]}
                 >
-                  {mockPets[cardAData % totalPets] && renderCard(mockPets[cardAData % totalPets], false)}
+                  {filteredPets[cardAData % totalPets] && renderCard(filteredPets[cardAData % totalPets], false)}
                   
                   {/* Like indicator - only show on active card */}
                   <Animated.View style={[styles.likeIndicator, likeIndicatorStyle]}>
@@ -380,7 +438,7 @@ export default function HomeScreen() {
                 style={[styles.cardWrapper, cardAAnimatedStyle]}
                 pointerEvents="none"
               >
-                {mockPets[cardAData % totalPets] && renderCard(mockPets[cardAData % totalPets], true)}
+                {filteredPets[cardAData % totalPets] && renderCard(filteredPets[cardAData % totalPets], true)}
               </Animated.View>
             )}
             
@@ -391,7 +449,7 @@ export default function HomeScreen() {
                   key="card-b"
                   style={[styles.cardWrapper, cardBAnimatedStyle]}
                 >
-                  {mockPets[cardBData % totalPets] && renderCard(mockPets[cardBData % totalPets], false)}
+                  {filteredPets[cardBData % totalPets] && renderCard(filteredPets[cardBData % totalPets], false)}
                   
                   {/* Like indicator - only show on active card */}
                   <Animated.View style={[styles.likeIndicator, likeIndicatorStyle]}>
@@ -410,7 +468,7 @@ export default function HomeScreen() {
                 style={[styles.cardWrapper, cardBAnimatedStyle]}
                 pointerEvents="none"
               >
-                {mockPets[cardBData % totalPets] && renderCard(mockPets[cardBData % totalPets], true)}
+                {filteredPets[cardBData % totalPets] && renderCard(filteredPets[cardBData % totalPets], true)}
               </Animated.View>
             )}
           </>
@@ -427,6 +485,14 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
       )}
+
+      {/* Filter Modal */}
+      <FilterModal
+        visible={showFilterModal}
+        onClose={() => setShowFilterModal(false)}
+        onApplyFilters={setFilters}
+        currentFilters={filters}
+      />
     </SafeAreaView>
   );
 }

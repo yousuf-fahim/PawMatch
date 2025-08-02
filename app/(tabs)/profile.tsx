@@ -33,6 +33,14 @@ export default function ProfileScreen() {
     router.push(`/pet/${petId}?owner=true` as any);
   };
 
+  const handleAppSettings = () => {
+    router.push('/profile/app-settings' as any);
+  };
+
+  const handleAccountSettings = () => {
+    router.push('/profile/account-settings' as any);
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false}>
@@ -120,17 +128,13 @@ export default function ProfileScreen() {
 
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Settings</Text>
-            <TouchableOpacity style={styles.settingItem}>
+            <TouchableOpacity style={styles.settingItem} onPress={handleAppSettings}>
               <Settings size={20} color="#666" />
               <Text style={styles.settingText}>App Settings</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.settingItem}>
+            <TouchableOpacity style={styles.settingItem} onPress={handleAccountSettings}>
               <User size={20} color="#666" />
               <Text style={styles.settingText}>Account Settings</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.settingItem}>
-              <Heart size={20} color="#666" />
-              <Text style={styles.settingText}>Notifications</Text>
             </TouchableOpacity>
           </View>
         </View>

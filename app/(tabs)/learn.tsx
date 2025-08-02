@@ -33,6 +33,8 @@ const iconMap: Record<string, LucideIcon> = {
 
 export default function LearnScreen() {
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<typeof mockLearningArticles>([]);
+  const [isSearching, setIsSearching] = useState(false);
   const router = useRouter();
   const featuredArticles = getFeaturedArticles();
   
@@ -40,13 +42,51 @@ export default function LearnScreen() {
   const mainCategories = learningCategories.filter(category => category.id !== 'pet-services');
   const petServicesCategory = learningCategories.find(category => category.id === 'pet-services');
 
+  const handleSearch = (text: string) => {
+    setSearchQuery(text);
+    
+    if (text.trim() === '') {
+      setIsSearching(false);
+      setSearchResults([]);
+      return;
+    }
+    
+    setIsSearching(true);
+    const filtered = mockLearningArticles.filter(article => 
+      article.title.toLowerCase().includes(text.toLowerCase()) ||
+      article.summary.toLowerCase().includes(text.toLowerCase()) ||
+      article.tags.some(tag => tag.toLowerCase().includes(text.toLowerCase()))
+    );
+    
+    setSearchResults(filtered);
+  };
+
+  const clearSearch = () => {
+    setSearchQuery('');
+    setIsSearching(false);
+    setSearchResults([]);
+  };
+
   const handleCategoryPress = (categoryId: string) => {
-    console.log('Navigate to category:', categoryId);
-    // TODO: Navigate to category screen
+    router.push({
+      pathname: '/learn/category/[id]' as any,
+      params: { id: categoryId }
+    });
   };
 
   const handleArticlePress = (articleId: string) => {
-    router.push(`/learn/article/${articleId}` as any);
+    router.push({
+      pathname: '/learn/article/[id]' as any, 
+      params: { id: articleId }
+    });
+  };
+
+  const handleExploreServices = () => {
+    router.push('/learn/services' as any);
+  };
+
+  const handleAIVetChat = () => {
+    router.push('/learn/ai-vet' as any);
   };
 
   const renderCategoryCard = (category: typeof learningCategories[0]) => {
@@ -150,118 +190,171 @@ export default function LearnScreen() {
               placeholder="Search articles, tips, guides..."
               placeholderTextColor="#999"
               value={searchQuery}
-              onChangeText={setSearchQuery}
+              onChangeText={handleSearch}
             />
+            {searchQuery !== '' && (
+              <TouchableOpacity onPress={clearSearch} style={styles.clearButton}>
+                <Text style={styles.clearButtonText}>×</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
 
-        {/* Featured Article */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Star size={20} color="#FF6B6B" />
-            <Text style={styles.sectionTitle}>Featured Article</Text>
-          </View>
-          {renderArticleCard(featuredArticles[0], true)}
-        </View>
-
-        {/* Categories */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Explore Topics</Text>
-          <View style={styles.categoriesContainer}>
-            {mainCategories.map(renderCategoryCard)}
-          </View>
-        </View>
-
-        {/* Recent Articles */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Latest Articles</Text>
-          {mockLearningArticles.slice(1, 4).map(article => (
-            <View key={article.id} style={styles.recentArticle}>
-              <Image source={{ uri: article.featuredImage }} style={styles.recentArticleImage} />
-              <View style={styles.recentArticleContent}>
-                <Text style={styles.recentArticleTitle} numberOfLines={2}>
-                  {article.title}
-                </Text>
-                <Text style={styles.recentArticleAuthor}>By {article.author}</Text>
-                <View style={styles.recentArticleMeta}>
-                  <View style={styles.metaItem}>
-                    <Clock size={12} color="#666" />
-                    <Text style={styles.recentMetaText}>{article.estimatedReadTime} min</Text>
+        {/* Search Results */}
+        {isSearching && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>
+              Search Results {searchResults.length > 0 && `(${searchResults.length})`}
+            </Text>
+            {searchResults.length > 0 ? (
+              searchResults.map(article => (
+                <TouchableOpacity
+                  key={article.id}
+                  style={styles.searchResultItem}
+                  onPress={() => handleArticlePress(article.id)}
+                >
+                  <Image source={{ uri: article.featuredImage }} style={styles.searchResultImage} />
+                  <View style={styles.searchResultContent}>
+                    <Text style={styles.searchResultTitle} numberOfLines={2}>
+                      {article.title}
+                    </Text>
+                    <Text style={styles.searchResultSummary} numberOfLines={2}>
+                      {article.summary}
+                    </Text>
+                    <View style={styles.searchResultMeta}>
+                      <Text style={styles.searchResultCategory}>
+                        {learningCategories.find(cat => cat.id === article.category)?.name}
+                      </Text>
+                      <Text style={styles.searchResultReadTime}>{article.estimatedReadTime} min read</Text>
+                    </View>
                   </View>
-                  <View style={styles.metaItem}>
-                    <Eye size={12} color="#666" />
-                    <Text style={styles.recentMetaText}>{article.views}</Text>
-                  </View>
-                </View>
+                </TouchableOpacity>
+              ))
+            ) : (
+              <View style={styles.noResultsContainer}>
+                <Text style={styles.noResultsText}>No articles found for "{searchQuery}"</Text>
+                <Text style={styles.noResultsSubtext}>Try different keywords or browse categories below</Text>
+              </View>
+            )}
+          </View>
+        )}
+
+        {/* Show regular content only when not searching */}
+        {!isSearching && (
+          <>
+            {/* Featured Article */}
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Star size={20} color="#FF6B6B" />
+                <Text style={styles.sectionTitle}>Featured Article</Text>
+              </View>
+              {renderArticleCard(featuredArticles[0], true)}
+            </View>
+
+            {/* Categories */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Explore Topics</Text>
+              <View style={styles.categoriesContainer}>
+                {mainCategories.map(renderCategoryCard)}
               </View>
             </View>
-          ))}
-        </View>
 
-        {/* Pet Services Section */}
-        <View style={styles.section}>
-          <View style={styles.petServicesCard}>
-            <LinearGradient
-              colors={['#9013FE', '#6C1CE7']}
-              style={styles.petServicesGradient}
-            >
-              <View style={styles.petServicesContent}>
-                <View style={styles.petServicesIconContainer}>
-                  <MapPin size={32} color="white" strokeWidth={2} />
-                </View>
-                <View style={styles.petServicesInfo}>
-                  <Text style={styles.petServicesTitle}>Pet Services</Text>
-                  <Text style={styles.petServicesDescription}>
-                    Find trusted veterinarians, groomers, and pet shops near you
-                  </Text>
-                  <Text style={styles.petServicesCount}>
-                    {petServicesCategory?.articleCount} helpful guides available
-                  </Text>
-                </View>
-              </View>
-              <View style={styles.petServicesButtonContainer}>
-                <AnimatedButton 
-                  title="Explore Services" 
-                  onPress={() => handleCategoryPress('pet-services')}
-                  variant="secondary"
-                  size="medium"
-                  icon="map-pin"
-                />
-              </View>
-            </LinearGradient>
-          </View>
-        </View>
+            {/* Recent Articles */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Latest Articles</Text>
+              {mockLearningArticles.slice(1, 4).map(article => (
+                <TouchableOpacity 
+                  key={article.id} 
+                  style={styles.recentArticle}
+                  onPress={() => handleArticlePress(article.id)}
+                >
+                  <Image source={{ uri: article.featuredImage }} style={styles.recentArticleImage} />
+                  <View style={styles.recentArticleContent}>
+                    <Text style={styles.recentArticleTitle} numberOfLines={2}>
+                      {article.title}
+                    </Text>
+                    <Text style={styles.recentArticleAuthor}>By {article.author}</Text>
+                    <View style={styles.recentArticleMeta}>
+                      <View style={styles.metaItem}>
+                        <Clock size={12} color="#666" />
+                        <Text style={styles.recentMetaText}>{article.estimatedReadTime} min</Text>
+                      </View>
+                      <View style={styles.metaItem}>
+                        <Eye size={12} color="#666" />
+                        <Text style={styles.recentMetaText}>{article.views}</Text>
+                      </View>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
 
-        {/* AI Assistant Teaser */}
-        <View style={styles.section}>
-          <View style={styles.aiAssistantCard}>
-            <LinearGradient
-              colors={['#667eea', '#764ba2']}
-              style={styles.aiAssistantGradient}
-            >
-              <View style={styles.aiAssistantContent}>
-                <View style={styles.aiAssistantIconContainer}>
-                  <Bot size={32} color="white" strokeWidth={2} />
-                </View>
-                <View style={styles.aiAssistantInfo}>
-                  <Text style={styles.aiAssistantTitle}>AI Pet Counselor</Text>
-                  <Text style={styles.aiAssistantDescription}>
-                    Get expert veterinary advice 24/7. Ask about health, behavior, training, and emergency care.
-                  </Text>
-                </View>
+            {/* Pet Services Section */}
+            <View style={styles.section}>
+              <View style={styles.petServicesCard}>
+                <LinearGradient
+                  colors={['#9013FE', '#6C1CE7']}
+                  style={styles.petServicesGradient}
+                >
+                  <View style={styles.petServicesContent}>
+                    <View style={styles.petServicesIconContainer}>
+                      <MapPin size={32} color="white" strokeWidth={2} />
+                    </View>
+                    <View style={styles.petServicesInfo}>
+                      <Text style={styles.petServicesTitle}>Pet Services</Text>
+                      <Text style={styles.petServicesDescription}>
+                        Find trusted veterinarians, groomers, and pet shops near you
+                      </Text>
+                      <Text style={styles.petServicesCount}>
+                        {petServicesCategory?.articleCount} helpful guides available
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={styles.petServicesButtonContainer}>
+                    <AnimatedButton 
+                      title="Explore Services" 
+                      onPress={handleExploreServices}
+                      variant="secondary"
+                      size="medium"
+                      icon="map-pin"
+                    />
+                  </View>
+                </LinearGradient>
               </View>
-              <View style={styles.aiButtonContainer}>
-                <AnimatedButton 
-                  title="Chat with AI Vet" 
-                  onPress={() => console.log('AI Assistant pressed')}
-                  variant="secondary"
-                  size="medium"
-                  icon="bot"
-                />
+            </View>
+
+            {/* AI Assistant Teaser */}
+            <View style={styles.section}>
+              <View style={styles.aiAssistantCard}>
+                <LinearGradient
+                  colors={['#667eea', '#764ba2']}
+                  style={styles.aiAssistantGradient}
+                >
+                  <View style={styles.aiAssistantContent}>
+                    <View style={styles.aiAssistantIconContainer}>
+                      <Bot size={32} color="white" strokeWidth={2} />
+                    </View>
+                    <View style={styles.aiAssistantInfo}>
+                      <Text style={styles.aiAssistantTitle}>AI Pet Counselor</Text>
+                      <Text style={styles.aiAssistantDescription}>
+                        Get expert veterinary advice 24/7. Ask about health, behavior, training, and emergency care.
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={styles.aiButtonContainer}>
+                    <AnimatedButton 
+                      title="Chat with AI Vet" 
+                      onPress={handleAIVetChat}
+                      variant="secondary"
+                      size="medium"
+                      icon="bot"
+                    />
+                  </View>
+                </LinearGradient>
               </View>
-            </LinearGradient>
-          </View>
-        </View>
+            </View>
+          </>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -602,5 +695,88 @@ const styles = StyleSheet.create({
   },
   petServicesButtonContainer: {
     alignItems: 'flex-start',
+  },
+  clearButton: {
+    padding: 4,
+    marginLeft: 8,
+  },
+  clearButtonText: {
+    fontSize: 20,
+    color: '#999',
+    fontWeight: 'bold',
+  },
+  searchResultItem: {
+    flexDirection: 'row',
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  searchResultImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+    marginRight: 12,
+  },
+  searchResultContent: {
+    flex: 1,
+    justifyContent: 'space-between',
+  },
+  searchResultTitle: {
+    fontSize: 16,
+    fontFamily: 'Poppins-SemiBold',
+    color: '#333',
+    marginBottom: 4,
+  },
+  searchResultSummary: {
+    fontSize: 14,
+    fontFamily: 'Nunito-Regular',
+    color: '#666',
+    marginBottom: 8,
+    lineHeight: 20,
+  },
+  searchResultMeta: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  searchResultCategory: {
+    fontSize: 12,
+    fontFamily: 'Nunito-SemiBold',
+    color: '#FF6B6B',
+    backgroundColor: '#FFF5F5',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  searchResultReadTime: {
+    fontSize: 12,
+    fontFamily: 'Nunito-Regular',
+    color: '#999',
+  },
+  noResultsContainer: {
+    alignItems: 'center',
+    padding: 40,
+    backgroundColor: 'white',
+    borderRadius: 12,
+    marginBottom: 12,
+  },
+  noResultsText: {
+    fontSize: 16,
+    fontFamily: 'Poppins-SemiBold',
+    color: '#333',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  noResultsSubtext: {
+    fontSize: 14,
+    fontFamily: 'Nunito-Regular',
+    color: '#666',
+    textAlign: 'center',
   },
 });
