@@ -27,18 +27,28 @@ export default function HomeScreen() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [likedPets, setLikedPets] = useState<string[]>([]);
   const [isAnimating, setIsAnimating] = useState(false);
+  
+  // Double buffer: maintain two separate card states
+  const [cardAData, setCardAData] = useState(0); // Index for card A
+  const [cardBData, setCardBData] = useState(1); // Index for card B
+  const [activeCard, setActiveCard] = useState<'A' | 'B'>('A'); // Which card is currently visible
 
-  // Animation values
+  // Animation values for both cards
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
   const scale = useSharedValue(1);
   const rotate = useSharedValue(0);
+  
+  // Opacity values for each card (only one visible at a time)
+  const cardAOpacity = useSharedValue(1);
+  const cardBOpacity = useSharedValue(0);
 
-  // Safe access to pets with error handling
+  // Safe access to pets with error handling - using double buffer
   const totalPets = mockPets?.length || 0;
-  const safeCurrentIndex = totalPets > 0 ? currentIndex % totalPets : 0;
-  const currentPet = totalPets > 0 ? mockPets[safeCurrentIndex] : null;
-  const nextPet = totalPets > 1 ? mockPets[(safeCurrentIndex + 1) % totalPets] : null;
+  
+  // Get the current active pet based on which card is active
+  const currentPetIndex = activeCard === 'A' ? cardAData : cardBData;
+  const currentPet = totalPets > 0 ? mockPets[currentPetIndex % totalPets] : null;
 
   const handleLike = () => {
     if (currentPet) {
@@ -64,24 +74,46 @@ export default function HomeScreen() {
     }
   };
 
-  const nextCard = () => {
+    const nextCard = () => {
     if (totalPets === 0 || isAnimating) return;
     
     setIsAnimating(true);
     
-    // Loop back to beginning when we reach the end
-    const newIndex = (currentIndex + 1) % totalPets;
+    // Get current indices
+    const currentAIndex = cardAData;
+    const currentBIndex = cardBData;
     
-    // Update index immediately to prevent ghost image
-    setCurrentIndex(newIndex);
+    if (activeCard === 'A') {
+      // A is currently visible, B will become visible
+      // Update A to show the next pet after B
+      const nextAIndex = (currentBIndex + 1) % totalPets;
+      setCardAData(nextAIndex);
+      
+      // Switch to card B
+      cardAOpacity.value = 0;
+      cardBOpacity.value = 1;
+      setActiveCard('B');
+      setCurrentIndex(currentBIndex);
+    } else {
+      // B is currently visible, A will become visible  
+      // Update B to show the next pet after A
+      const nextBIndex = (currentAIndex + 1) % totalPets;
+      setCardBData(nextBIndex);
+      
+      // Switch to card A
+      cardBOpacity.value = 0;
+      cardAOpacity.value = 1;
+      setActiveCard('A');
+      setCurrentIndex(currentAIndex);
+    }
     
-    // Reset animation values immediately for next card
+    // Reset animation values immediately
     translateX.value = 0;
     translateY.value = 0;
     scale.value = 1;
     rotate.value = 0;
     
-    // Release animation lock after minimal delay
+    // Small delay to ensure React state updates are processed
     setTimeout(() => {
       setIsAnimating(false);
     }, 50);
@@ -110,6 +142,7 @@ export default function HomeScreen() {
   const gestureHandler = useAnimatedGestureHandler({
     onStart: (_, context: any) => {
       if (isAnimating) return;
+      // Always start from current position (should be 0 after reset)
       context.startX = translateX.value;
       context.startY = translateY.value;
     },
@@ -142,12 +175,14 @@ export default function HomeScreen() {
       const shouldSwipeRight = translateX.value > SWIPE_THRESHOLD;
       
       if (shouldSwipeLeft) {
+        // Animate card off screen, then handle the swipe
         translateX.value = withTiming(-width, { duration: 150 }, (finished) => {
           if (finished) {
             runOnJS(handlePass)();
           }
         });
       } else if (shouldSwipeRight) {
+        // Animate card off screen, then handle the swipe
         translateX.value = withTiming(width, { duration: 150 }, (finished) => {
           if (finished) {
             runOnJS(handleLike)();
@@ -164,7 +199,9 @@ export default function HomeScreen() {
   });
 
   const cardAnimatedStyle = useAnimatedStyle(() => {
+    const currentOpacity = activeCard === 'A' ? cardAOpacity.value : cardBOpacity.value;
     return {
+      opacity: currentOpacity,
       transform: [
         { translateX: translateX.value },
         { translateY: translateY.value },
@@ -174,25 +211,27 @@ export default function HomeScreen() {
     };
   });
 
-  const nextCardAnimatedStyle = useAnimatedStyle(() => {
-    // Next card stays in place and scales up slightly as current card moves
-    const scaleValue = interpolate(
-      Math.abs(translateX.value),
-      [0, width * 0.5],
-      [0.95, 1],
-      Extrapolate.CLAMP
-    );
-    
-    const opacityValue = interpolate(
-      Math.abs(translateX.value),
-      [0, width * 0.3],
-      [0.8, 1],
-      Extrapolate.CLAMP
-    );
-    
+  const cardAAnimatedStyle = useAnimatedStyle(() => {
     return {
-      opacity: opacityValue,
-      transform: [{ scale: scaleValue }],
+      opacity: cardAOpacity.value,
+      transform: [
+        { translateX: activeCard === 'A' ? translateX.value : 0 },
+        { translateY: activeCard === 'A' ? translateY.value : 0 },
+        { rotate: activeCard === 'A' ? `${rotate.value}deg` : '0deg' },
+        { scale: activeCard === 'A' ? scale.value : 1 },
+      ],
+    };
+  });
+
+  const cardBAnimatedStyle = useAnimatedStyle(() => {
+    return {
+      opacity: cardBOpacity.value,
+      transform: [
+        { translateX: activeCard === 'B' ? translateX.value : 0 },
+        { translateY: activeCard === 'B' ? translateY.value : 0 },
+        { rotate: activeCard === 'B' ? `${rotate.value}deg` : '0deg' },
+        { scale: activeCard === 'B' ? scale.value : 1 },
+      ],
     };
   });
 
@@ -230,7 +269,6 @@ export default function HomeScreen() {
     
     return (
       <TouchableOpacity 
-        key={pet.id} 
         style={[styles.petCard, isNext && styles.nextCard]}
         onPress={isNext ? undefined : handleCardPress}
         activeOpacity={isNext ? 1 : 0.95}
@@ -267,7 +305,7 @@ export default function HomeScreen() {
           
           <View style={styles.personalityContainer}>
             {(pet.personality || []).slice(0, 3).map((trait: string, index: number) => (
-              <View key={`${pet.id}-${index}`} style={styles.personalityTag}>
+              <View key={index} style={styles.personalityTag}>
                 <Text style={styles.personalityText}>{trait}</Text>
               </View>
             ))}
@@ -308,7 +346,7 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      <View style={styles.cardContainer}>
+            <View style={styles.cardContainer}>
         {totalPets === 0 ? (
           <View style={styles.noMoreCards}>
             <Text style={styles.noMoreText}>No pets available</Text>
@@ -316,36 +354,64 @@ export default function HomeScreen() {
           </View>
         ) : (
           <>
-            {/* Next card (behind) */}
-            {nextPet && (
-              <Animated.View 
-                key={`next-${nextPet.id}`}
-                style={[styles.cardWrapper, nextCardAnimatedStyle]}
-              >
-                {renderCard(nextPet, true)}
-              </Animated.View>
-            )}
-            
-            {/* Current card (front) */}
-            {currentPet && (
+            {/* Card A - Double Buffer System */}
+            {activeCard === 'A' ? (
               <PanGestureHandler onGestureEvent={gestureHandler}>
                 <Animated.View 
-                  key={`current-${currentPet.id}`}
-                  style={[styles.cardWrapper, cardAnimatedStyle]}
+                  key="card-a"
+                  style={[styles.cardWrapper, cardAAnimatedStyle]}
                 >
-                  {renderCard(currentPet)}
+                  {mockPets[cardAData % totalPets] && renderCard(mockPets[cardAData % totalPets], false)}
                   
-                  {/* Like indicator */}
+                  {/* Like indicator - only show on active card */}
                   <Animated.View style={[styles.likeIndicator, likeIndicatorStyle]}>
                     <Text style={styles.indicatorText}>LIKE</Text>
                   </Animated.View>
                   
-                  {/* Pass indicator */}
+                  {/* Pass indicator - only show on active card */}
                   <Animated.View style={[styles.passIndicator, passIndicatorStyle]}>
                     <Text style={styles.indicatorText}>PASS</Text>
                   </Animated.View>
                 </Animated.View>
               </PanGestureHandler>
+            ) : (
+              <Animated.View 
+                key="card-a"
+                style={[styles.cardWrapper, cardAAnimatedStyle]}
+                pointerEvents="none"
+              >
+                {mockPets[cardAData % totalPets] && renderCard(mockPets[cardAData % totalPets], true)}
+              </Animated.View>
+            )}
+            
+            {/* Card B - Double Buffer System */}
+            {activeCard === 'B' ? (
+              <PanGestureHandler onGestureEvent={gestureHandler}>
+                <Animated.View 
+                  key="card-b"
+                  style={[styles.cardWrapper, cardBAnimatedStyle]}
+                >
+                  {mockPets[cardBData % totalPets] && renderCard(mockPets[cardBData % totalPets], false)}
+                  
+                  {/* Like indicator - only show on active card */}
+                  <Animated.View style={[styles.likeIndicator, likeIndicatorStyle]}>
+                    <Text style={styles.indicatorText}>LIKE</Text>
+                  </Animated.View>
+                  
+                  {/* Pass indicator - only show on active card */}
+                  <Animated.View style={[styles.passIndicator, passIndicatorStyle]}>
+                    <Text style={styles.indicatorText}>PASS</Text>
+                  </Animated.View>
+                </Animated.View>
+              </PanGestureHandler>
+            ) : (
+              <Animated.View 
+                key="card-b"
+                style={[styles.cardWrapper, cardBAnimatedStyle]}
+                pointerEvents="none"
+              >
+                {mockPets[cardBData % totalPets] && renderCard(mockPets[cardBData % totalPets], true)}
+              </Animated.View>
             )}
           </>
         )}
@@ -589,8 +655,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingBottom: 10,
-    paddingTop: 10,
+    paddingBottom: 0,
+    paddingTop: 5,
     gap: 80,
   },
   passButton: {
