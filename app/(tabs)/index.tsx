@@ -17,6 +17,7 @@ import Animated, {
 import { LinearGradient } from 'expo-linear-gradient';
 import { mockPets } from '@/data/pets';
 import FilterModal, { Filters } from '@/components/FilterModal';
+import { supabase, databaseService, authService, Pet } from '@/lib/supabase';
 
 const { width, height } = Dimensions.get('window');
 const CARD_WIDTH = width - 30;
@@ -35,7 +36,12 @@ export default function HomeScreen() {
     size: 'All Sizes',
     distance: 'Any Distance'
   });
-  const [filteredPets, setFilteredPets] = useState(mockPets);
+  
+  // Database integration
+  const [pets, setPets] = useState<Pet[]>([]);
+  const [filteredPets, setFilteredPets] = useState<Pet[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [user, setUser] = useState<any>(null);
   
   // Double buffer: maintain two separate card states
   const [cardAData, setCardAData] = useState(0); // Index for card A
@@ -59,14 +65,81 @@ export default function HomeScreen() {
   const currentPetIndex = activeCard === 'A' ? cardAData : cardBData;
   const currentPet = totalPets > 0 ? filteredPets[currentPetIndex % totalPets] : null;
 
+  // Initialize data loading
+  useEffect(() => {
+    initializeData();
+  }, []);
+
+  // Load user and pets data
+  const initializeData = async () => {
+    try {
+      setIsLoading(true);
+      
+      // Get current user
+      const currentUser = await authService.getCurrentUser();
+      setUser(currentUser);
+      
+      // Load pets from database
+      if (supabase) {
+        const petsData = currentUser 
+          ? await databaseService.getPetsExcludingInteracted(currentUser.id)
+          : await databaseService.getAvailablePets();
+        
+        if (petsData.length > 0) {
+          setPets(petsData);
+          setFilteredPets(petsData);
+        } else {
+          // Fallback to mock data if no database pets
+          const mockPetsConverted = convertMockPetsToDBFormat(mockPets);
+          setPets(mockPetsConverted);
+          setFilteredPets(mockPetsConverted);
+        }
+      } else {
+        // Use mock data if Supabase not configured
+        const mockPetsConverted = convertMockPetsToDBFormat(mockPets);
+        setPets(mockPetsConverted);
+        setFilteredPets(mockPetsConverted);
+      }
+    } catch (error) {
+      console.error('Error loading data:', error);
+      // Fallback to mock data on error
+      const mockPetsConverted = convertMockPetsToDBFormat(mockPets);
+      setPets(mockPetsConverted);
+      setFilteredPets(mockPetsConverted);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Convert mock pets to database format
+  const convertMockPetsToDBFormat = (mockPets: any[]): Pet[] => {
+    return mockPets.map(pet => ({
+      id: pet.id,
+      name: pet.name,
+      breed: pet.breed,
+      age: parseInt(pet.age.replace(/[^\d]/g, '')) || 1, // Extract number from age string
+      gender: pet.gender.toLowerCase() as 'male' | 'female',
+      size: pet.size.toLowerCase() as 'small' | 'medium' | 'large',
+      color: 'Mixed', // Default color since mock data doesn't have this
+      personality: pet.personality || [],
+      description: pet.description || 'A wonderful pet looking for a loving home.',
+      images: pet.image ? [pet.image] : [],
+      location: pet.location || 'Unknown',
+      contact_info: { shelter: 'Local Shelter', phone: '(555) 123-4567' },
+      adoption_status: 'available' as const,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    }));
+  };
+
   // Apply filters when they change
   useEffect(() => {
     applyFilters(filters);
-  }, [filters]);
+  }, [filters, pets]);
 
   // Filter pets based on selected criteria
   const applyFilters = (newFilters: Filters) => {
-    let filtered = [...mockPets];
+    let filtered = [...pets];
     
     // Apply breed filter
     if (newFilters.breed !== 'All Breeds') {
@@ -76,20 +149,20 @@ export default function HomeScreen() {
     // Apply age filter
     if (newFilters.age !== 'All Ages') {
       filtered = filtered.filter(pet => {
-        const petAge = pet.age.toLowerCase();
+        const petAge = pet.age;
         const filterAge = newFilters.age.toLowerCase();
         
         if (filterAge.includes('puppy') || filterAge.includes('kitten')) {
-          return petAge.includes('month') || petAge.includes('puppy') || petAge.includes('kitten');
+          return petAge < 1;
         }
         if (filterAge.includes('young')) {
-          return petAge.includes('1') || petAge.includes('2') || petAge.includes('3');
+          return petAge >= 1 && petAge <= 3;
         }
         if (filterAge.includes('adult')) {
-          return petAge.includes('4') || petAge.includes('5') || petAge.includes('6') || petAge.includes('7');
+          return petAge >= 4 && petAge <= 7;
         }
         if (filterAge.includes('senior')) {
-          return petAge.includes('8') || petAge.includes('9') || petAge.includes('10') || petAge.includes('senior');
+          return petAge >= 8;
         }
         return true;
       });
@@ -97,7 +170,9 @@ export default function HomeScreen() {
     
     // Apply size filter
     if (newFilters.size !== 'All Sizes') {
-      filtered = filtered.filter(pet => pet.size === newFilters.size);
+      filtered = filtered.filter(pet => 
+        pet.size.toLowerCase() === newFilters.size.toLowerCase()
+      );
     }
     
     setFilteredPets(filtered);
@@ -110,14 +185,31 @@ export default function HomeScreen() {
     cardBOpacity.value = 0;
   };
 
-  const handleLike = () => {
+  const handleLike = async () => {
     if (currentPet) {
       setLikedPets(prev => [...prev, currentPet.id]);
+      
+      // Record interaction in database if user is logged in
+      if (user && supabase) {
+        try {
+          await databaseService.recordPetInteraction(user.id, currentPet.id, 'like');
+          await databaseService.addToFavorites(user.id, currentPet.id);
+        } catch (error) {
+          console.error('Error recording like:', error);
+        }
+      }
     }
     nextCard();
   };
 
-  const handlePass = () => {
+  const handlePass = async () => {
+    if (currentPet && user && supabase) {
+      try {
+        await databaseService.recordPetInteraction(user.id, currentPet.id, 'pass');
+      } catch (error) {
+        console.error('Error recording pass:', error);
+      }
+    }
     nextCard();
   };
 
@@ -317,15 +409,13 @@ export default function HomeScreen() {
     return { opacity };
   });
 
-  const renderCard = (pet: any, isNext = false) => {
+  const renderCard = (pet: Pet | null, isNext = false) => {
     if (!pet) return null;
     
-    // Handle both single image strings and image arrays
-    const imageUri = Array.isArray(pet.image) 
-      ? pet.image[0] 
-      : typeof pet.image === 'string' 
-        ? pet.image 
-        : '';
+    // Handle the images array from database Pet format
+    const imageUri = pet.images && pet.images.length > 0 
+      ? pet.images[0] 
+      : 'https://images.unsplash.com/photo-1560807707-8cc77767d783?w=400'; // Default fallback image
     
     return (
       <TouchableOpacity 
@@ -350,21 +440,21 @@ export default function HomeScreen() {
         {/* Pet info overlay */}
         <View style={styles.petInfoOverlay}>
           <View style={styles.petHeader}>
-            <Text style={styles.petName}>{pet.name || 'Unknown'}</Text>
+            <Text style={styles.petName}>{pet.name}</Text>
             <View style={styles.ageContainer}>
-              <Text style={styles.petAge}>{pet.age || 'Unknown age'}</Text>
+              <Text style={styles.petAge}>{pet.age} {pet.age === 1 ? 'year' : 'years'} old</Text>
             </View>
           </View>
           
-          <Text style={styles.petBreed}>{pet.breed || 'Mixed breed'}</Text>
+          <Text style={styles.petBreed}>{pet.breed}</Text>
           
           <View style={styles.locationContainer}>
             <MapPin size={16} color="rgba(255,255,255,0.8)" />
-            <Text style={styles.petLocation}>{pet.location || 'Location unknown'}</Text>
+            <Text style={styles.petLocation}>{pet.location}</Text>
           </View>
           
           <View style={styles.personalityContainer}>
-            {(pet.personality || []).slice(0, 3).map((trait: string, index: number) => (
+            {pet.personality.slice(0, 3).map((trait: string, index: number) => (
               <View key={index} style={styles.personalityTag}>
                 <Text style={styles.personalityText}>{trait}</Text>
               </View>
@@ -372,7 +462,7 @@ export default function HomeScreen() {
           </View>
           
           <Text style={styles.petDescription} numberOfLines={2}>
-            {pet.description || 'No description available'}
+            {pet.description}
           </Text>
         </View>
         
@@ -397,14 +487,21 @@ export default function HomeScreen() {
       <View style={styles.header}>
         <Text style={styles.title}>Discover</Text>
         <View style={styles.headerButtons}>
-          
+          <TouchableOpacity style={styles.headerButton} onPress={() => setShowFilterModal(true)}>
+            <Filter size={24} color="#FF6B6B" />
+          </TouchableOpacity>
           <TouchableOpacity style={styles.headerButton} onPress={() => router.push('/notifications')}>
             <Bell size={24} color="#FF6B6B" />
           </TouchableOpacity>
         </View>
       </View>
 
-            <View style={styles.cardContainer}>
+      {isLoading ? (
+        <View style={styles.loadingContainer}>
+          <Text style={styles.loadingText}>Finding perfect pets for you...</Text>
+        </View>
+      ) : (
+        <View style={styles.cardContainer}>
         {totalPets === 0 ? (
           <View style={styles.noMoreCards}>
             <Text style={styles.noMoreText}>No pets available</Text>
@@ -474,6 +571,7 @@ export default function HomeScreen() {
           </>
         )}
       </View>
+      )}
 
       {currentPet && totalPets > 0 && (
         <View style={styles.actionButtons}>
@@ -779,5 +877,17 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: 4,
     backgroundColor: 'white',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  loadingText: {
+    fontSize: 18,
+    fontFamily: 'Poppins-Medium',
+    color: '#FF6B6B',
+    textAlign: 'center',
   },
 });

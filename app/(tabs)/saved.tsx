@@ -1,9 +1,10 @@
 import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity, ScrollView, Linking, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'expo-router';
 import { Heart, MapPin, MessageCircle, Share2, Clock, CheckCircle, XCircle, Search } from 'lucide-react-native';
 import { mockPets } from '@/data/pets';
+import { supabase, databaseService, authService, Pet } from '@/lib/supabase';
 
 // Mock adoption requests data
 const mockAdoptionRequests = [
@@ -68,9 +69,76 @@ const getStatusColor = (status: string) => {
 export default function SavedScreen() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'saved' | 'requests'>('saved');
-  
-  // Mock saved pets (first 3 pets)
-  const savedPets = mockPets.slice(0, 3);
+  const [savedPets, setSavedPets] = useState<Pet[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [user, setUser] = useState<any>(null);
+
+  useEffect(() => {
+    loadSavedPets();
+  }, []);
+
+  const loadSavedPets = async () => {
+    try {
+      setIsLoading(true);
+      
+      // Get current user
+      const currentUser = await authService.getCurrentUser();
+      setUser(currentUser);
+      
+      if (currentUser && supabase) {
+        // Load user's favorite pets from database
+        const favorites = await databaseService.getUserFavorites(currentUser.id);
+        setSavedPets(favorites);
+      } else {
+        // Fallback to mock data if not logged in or Supabase not configured
+        const mockPetsConverted = convertMockPetsToDBFormat(mockPets.slice(0, 3));
+        setSavedPets(mockPetsConverted);
+      }
+    } catch (error) {
+      console.error('Error loading saved pets:', error);
+      // Fallback to mock data on error
+      const mockPetsConverted = convertMockPetsToDBFormat(mockPets.slice(0, 3));
+      setSavedPets(mockPetsConverted);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Convert mock pets to database format (same function as in index.tsx)
+  const convertMockPetsToDBFormat = (mockPets: any[]): Pet[] => {
+    return mockPets.map(pet => ({
+      id: pet.id,
+      name: pet.name,
+      breed: pet.breed,
+      age: parseInt(pet.age.replace(/[^\d]/g, '')) || 1,
+      gender: pet.gender.toLowerCase() as 'male' | 'female',
+      size: pet.size.toLowerCase() as 'small' | 'medium' | 'large',
+      color: 'Mixed',
+      personality: pet.personality || [],
+      description: pet.description || 'A wonderful pet looking for a loving home.',
+      images: pet.image ? [pet.image] : [],
+      location: pet.location || 'Unknown',
+      contact_info: { shelter: 'Local Shelter', phone: '(555) 123-4567' },
+      adoption_status: 'available' as const,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    }));
+  };
+
+  const handleRemoveFromFavorites = async (petId: string) => {
+    if (user && supabase) {
+      try {
+        await databaseService.removeFromFavorites(user.id, petId);
+        // Update local state
+        setSavedPets(prev => prev.filter(pet => pet.id !== petId));
+      } catch (error) {
+        console.error('Error removing from favorites:', error);
+      }
+    } else {
+      // Just update local state for mock data
+      setSavedPets(prev => prev.filter(pet => pet.id !== petId));
+    }
+  };
 
   const handlePetPress = (petId: string) => {
     router.push({
@@ -172,17 +240,24 @@ export default function SavedScreen() {
     </TouchableOpacity>
   );
 
-  const renderPetItem = ({ item }: { item: typeof mockPets[0] }) => (
+  const renderPetItem = ({ item }: { item: Pet }) => (
     <TouchableOpacity style={styles.petCard} onPress={() => handlePetPress(item.id)}>
-      <Image source={{ uri: Array.isArray(item.image) ? item.image[0] : item.image }} style={styles.petImage} />
+      <Image 
+        source={{ 
+          uri: item.images && item.images.length > 0 
+            ? item.images[0] 
+            : 'https://images.unsplash.com/photo-1560807707-8cc77767d783?w=400'
+        }} 
+        style={styles.petImage} 
+      />
       <View style={styles.petInfo}>
         <View style={styles.petHeader}>
           <Text style={styles.petName}>{item.name}</Text>
-          <TouchableOpacity>
+          <TouchableOpacity onPress={() => handleRemoveFromFavorites(item.id)}>
             <Heart size={20} color="#FF6B6B" fill="#FF6B6B" />
           </TouchableOpacity>
         </View>
-        <Text style={styles.petBreed}>{item.breed} • {item.age}</Text>
+        <Text style={styles.petBreed}>{item.breed} • {item.age} {item.age === 1 ? 'year' : 'years'} old</Text>
         <View style={styles.locationRow}>
           <MapPin size={14} color="#666" />
           <Text style={styles.location}>{item.location}</Text>

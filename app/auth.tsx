@@ -7,6 +7,7 @@ import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Formik } from 'formik';
 import * as Yup from 'yup';
+import { supabase } from '../lib/supabase';
 
 const validationSchema = Yup.object().shape({
   email: Yup.string().email('Invalid email').required('Email is required'),
@@ -17,20 +18,102 @@ export default function AuthScreen() {
   const router = useRouter();
   const [isLogin, setIsLogin] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const handleAuth = (values: { email: string; password: string }) => {
-    // Mock authentication
-    if (Platform.OS !== 'web') {
-      // Add haptic feedback for mobile
-      // Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  const handleAuth = async (values: { email: string; password: string }) => {
+    if (!supabase) {
+      Alert.alert('Error', 'Authentication service not configured. Please check your setup.');
+      return;
     }
-    
-    router.push('/(tabs)');
+
+    try {
+      setLoading(true);
+      
+      if (isLogin) {
+        // Sign in existing user
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: values.email,
+          password: values.password,
+        });
+
+        if (error) {
+          Alert.alert('Sign In Error', error.message);
+          return;
+        }
+
+        if (data.user) {
+          // Create or update user profile
+          await createOrUpdateUserProfile(data.user);
+          router.push('/(tabs)');
+        }
+      } else {
+        // Sign up new user
+        const { data, error } = await supabase.auth.signUp({
+          email: values.email,
+          password: values.password,
+        });
+
+        if (error) {
+          Alert.alert('Sign Up Error', error.message);
+          return;
+        }
+
+        if (data.user) {
+          Alert.alert('Success', 'Please check your email to confirm your account!');
+          // Create user profile
+          await createOrUpdateUserProfile(data.user);
+          setIsLogin(true);
+        }
+      }
+    } catch (error) {
+      console.error('Auth error:', error);
+      Alert.alert('Error', 'An unexpected error occurred. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleSocialAuth = (provider: string) => {
-    // Mock social authentication
-    Alert.alert('Social Auth', `${provider} authentication coming soon!`);
+  const createOrUpdateUserProfile = async (user: any) => {
+    if (!supabase) return;
+
+    try {
+      const { error } = await supabase
+        .from('user_profiles')
+        .upsert({
+          id: user.id,
+          email: user.email,
+          updated_at: new Date().toISOString(),
+        });
+
+      if (error) {
+        console.error('Profile creation error:', error);
+      }
+    } catch (error) {
+      console.error('Profile creation error:', error);
+    }
+  };
+
+  const handleGoogleAuth = async () => {
+    if (!supabase) {
+      Alert.alert('Error', 'Authentication service not configured.');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+      });
+
+      if (error) {
+        Alert.alert('Google Sign In Error', error.message);
+      }
+    } catch (error) {
+      console.error('Google auth error:', error);
+      Alert.alert('Error', 'Google sign in failed. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -98,9 +181,13 @@ export default function AuthScreen() {
                   <Text style={styles.errorText}>{errors.password}</Text>
                 )}
 
-                <TouchableOpacity style={styles.authButton} onPress={() => handleSubmit()}>
+                <TouchableOpacity 
+                  style={[styles.authButton, loading && styles.authButtonDisabled]} 
+                  onPress={() => handleSubmit()}
+                  disabled={loading}
+                >
                   <Text style={styles.authButtonText}>
-                    {isLogin ? 'Sign In' : 'Create Account'}
+                    {loading ? 'Please wait...' : (isLogin ? 'Sign In' : 'Create Account')}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -114,17 +201,11 @@ export default function AuthScreen() {
           </View>
 
           <TouchableOpacity 
-            style={styles.socialButton} 
-            onPress={() => handleSocialAuth('Google')}
+            style={[styles.socialButton, loading && styles.authButtonDisabled]} 
+            onPress={handleGoogleAuth}
+            disabled={loading}
           >
             <Text style={styles.socialButtonText}>Continue with Google</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity 
-            style={styles.socialButton} 
-            onPress={() => handleSocialAuth('Facebook')}
-          >
-            <Text style={styles.socialButtonText}>Continue with Facebook</Text>
           </TouchableOpacity>
 
           <TouchableOpacity onPress={() => setIsLogin(!isLogin)}>
@@ -249,5 +330,8 @@ const styles = StyleSheet.create({
   switchLink: {
     color: 'white',
     fontFamily: 'Nunito-Bold',
+  },
+  authButtonDisabled: {
+    backgroundColor: 'rgba(255, 255, 255, 0.5)',
   },
 });

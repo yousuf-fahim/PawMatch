@@ -1,56 +1,22 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { ArrowLeft, Heart, Bell, CheckCheck, X, MessageCircle, Clock } from 'lucide-react-native';
+import { databaseService, supabase } from '../../lib/supabase';
+import AnimatedLoader from '../../components/AnimatedLoader';
 
-// Mock notifications data
-const mockNotifications = [
-  {
-    id: '1',
-    type: 'adoption_approved',
-    title: 'Adoption Request Approved! 🎉',
-    message: 'Your request to adopt Max has been approved! Please contact the shelter to arrange pickup.',
-    timestamp: '1 hour ago',
-    read: false,
-    petId: '1',
-    petName: 'Max',
-    petImage: 'https://images.unsplash.com/photo-1517849845537-4d257902454a?auto=format&fit=crop&w=400&h=400'
-  },
-  {
-    id: '2',
-    type: 'adoption_pending',
-    title: 'Application Under Review',
-    message: 'Your application for Luna is being reviewed. We will contact you within 2-3 days.',
-    timestamp: '2 days ago',
-    read: true,
-    petId: '2',
-    petName: 'Luna',
-    petImage: 'https://images.unsplash.com/photo-1543466835-00a7907e9de1?auto=format&fit=crop&w=400&h=400'
-  },
-  {
-    id: '3',
-    type: 'message',
-    title: 'New Message from Happy Paws Rescue',
-    message: 'Thank you for your interest in adopting Charlie. We have a few questions about your living situation.',
-    timestamp: '3 days ago',
-    read: true,
-    petId: '3',
-    petName: 'Charlie',
-    petImage: 'https://images.unsplash.com/photo-1583511655857-d19b40a7a54e?auto=format&fit=crop&w=400&h=400'
-  },
-  {
-    id: '4',
-    type: 'adoption_rejected',
-    title: 'Application Update',
-    message: 'Unfortunately, your application for Buddy was not selected. Please consider applying for other pets.',
-    timestamp: '1 week ago',
-    read: true,
-    petId: '4',
-    petName: 'Buddy',
-    petImage: 'https://images.unsplash.com/photo-1596492784531-6e6eb5ea9993?auto=format&fit=crop&w=400&h=400'
-  },
-];
+interface Notification {
+  id: string;
+  type: string;
+  title: string;
+  message: string;
+  timestamp: string;
+  read: boolean;
+  petId?: string;
+  petName?: string;
+  petImage?: string;
+}
 
 // Icon components for different notification types
 const NotificationIcon = ({ type, read }: { type: string; read: boolean }) => {
@@ -70,29 +36,110 @@ const NotificationIcon = ({ type, read }: { type: string; read: boolean }) => {
   }
 };
 
+// Helper function to format timestamps
+const formatTimestamp = (dateString: string) => {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diff = now.getTime() - date.getTime();
+  
+  const minutes = Math.floor(diff / (1000 * 60));
+  const hours = Math.floor(diff / (1000 * 60 * 60));
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  
+  if (minutes < 60) {
+    return `${minutes} minutes ago`;
+  } else if (hours < 24) {
+    return `${hours} hour${hours > 1 ? 's' : ''} ago`;
+  } else if (days < 7) {
+    return `${days} day${days > 1 ? 's' : ''} ago`;
+  } else {
+    return date.toLocaleDateString();
+  }
+};
+
 export default function NotificationsScreen() {
   const router = useRouter();
-  const [notifications, setNotifications] = useState(mockNotifications);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const markAsRead = (id: string) => {
-    setNotifications(prev =>
-      prev.map(notif =>
-        notif.id === id ? { ...notif, read: true } : notif
-      )
-    );
+  useEffect(() => {
+    loadNotifications();
+  }, []);
+
+  const loadNotifications = async () => {
+    try {
+      setLoading(true);
+      
+      // Get current user
+      if (!supabase) {
+        // If Supabase not configured, show empty state
+        setNotifications([]);
+        return;
+      }
+      
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setNotifications([]);
+        return;
+      }
+      
+      const userNotifications = await databaseService.getUserNotifications(user.id);
+      
+      // Transform database notifications to component format
+      const formattedNotifications: Notification[] = userNotifications.map(notif => ({
+        id: notif.id,
+        type: notif.type,
+        title: notif.title,
+        message: notif.message,
+        timestamp: formatTimestamp(notif.created_at),
+        read: notif.read,
+        petId: notif.pet_id,
+        petName: notif.pet_name,
+        petImage: notif.pet_image
+      }));
+      
+      setNotifications(formattedNotifications);
+    } catch (error) {
+      console.error('Error loading notifications:', error);
+      // Show empty state on error instead of alert in this case
+      setNotifications([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const markAllAsRead = () => {
-    setNotifications(prev =>
-      prev.map(notif => ({ ...notif, read: true }))
-    );
+  const markAsRead = async (id: string) => {
+    try {
+      await databaseService.markNotificationAsRead(id);
+      setNotifications((prev: Notification[]) =>
+        prev.map((notif: Notification) =>
+          notif.id === id ? { ...notif, read: true } : notif
+        )
+      );
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+    }
   };
 
-  const handleNotificationPress = (notification: typeof mockNotifications[0]) => {
+  const markAllAsRead = async () => {
+    try {
+      const unreadIds = notifications.filter(n => !n.read).map(n => n.id);
+      await Promise.all(unreadIds.map(id => databaseService.markNotificationAsRead(id)));
+      
+      setNotifications((prev: Notification[]) =>
+        prev.map((notif: Notification) => ({ ...notif, read: true }))
+      );
+    } catch (error) {
+      console.error('Error marking all notifications as read:', error);
+      Alert.alert('Error', 'Failed to mark notifications as read. Please try again.');
+    }
+  };
+
+  const handleNotificationPress = (notification: Notification) => {
     markAsRead(notification.id);
     
     // Navigate based on notification type
-    if (notification.type.includes('adoption')) {
+    if (notification.type.includes('adoption') && notification.petId) {
       router.push({
         pathname: '/pet-details/[id]',
         params: { id: notification.petId }
@@ -102,7 +149,7 @@ export default function NotificationsScreen() {
     }
   };
 
-  const renderNotificationItem = ({ item }: { item: typeof mockNotifications[0] }) => (
+  const renderNotificationItem = ({ item }: { item: Notification }) => (
     <TouchableOpacity
       style={[styles.notificationCard, !item.read && styles.unreadCard]}
       onPress={() => handleNotificationPress(item)}
@@ -112,7 +159,9 @@ export default function NotificationsScreen() {
           <View style={styles.iconContainer}>
             <NotificationIcon type={item.type} read={item.read} />
           </View>
-          <Image source={{ uri: item.petImage }} style={styles.petImage} />
+          {item.petImage && (
+            <Image source={{ uri: item.petImage }} style={styles.petImage} />
+          )}
         </View>
         
         <View style={styles.textContent}>
@@ -130,7 +179,25 @@ export default function NotificationsScreen() {
     </TouchableOpacity>
   );
 
-  const unreadCount = notifications.filter(n => !n.read).length;
+  const unreadCount = notifications.filter((n: Notification) => !n.read).length;
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <ArrowLeft size={24} color="#333" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Notifications</Text>
+          <View style={styles.markAllButton} />
+        </View>
+        <View style={styles.loadingContainer}>
+          <AnimatedLoader variant="dots" />
+          <Text style={styles.loadingText}>Loading notifications...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -298,5 +365,17 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingHorizontal: 40,
     lineHeight: 20,
+  },
+  loadingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 60,
+  },
+  loadingText: {
+    fontSize: 16,
+    fontFamily: 'Nunito-Regular',
+    color: '#666',
+    marginTop: 16,
   },
 });

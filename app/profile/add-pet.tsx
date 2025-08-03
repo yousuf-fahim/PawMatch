@@ -13,6 +13,7 @@ import {
   Info
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { supabase } from '@/lib/supabase';
 
 export default function AddPetScreen() {
   const router = useRouter();
@@ -23,6 +24,7 @@ export default function AddPetScreen() {
   const [petDescription, setPetDescription] = useState('');
   const [petLocation, setPetLocation] = useState('');
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
+  const [loading, setLoading] = useState(false);
 
   const handleBack = () => {
     router.back();
@@ -41,22 +43,72 @@ export default function AddPetScreen() {
     );
   };
 
-  const handleSavePet = () => {
+  const handleSavePet = async () => {
     if (!petName || !petBreed || !petAge || !petGender) {
       Alert.alert('Error', 'Please fill in all required fields');
       return;
     }
 
-    Alert.alert(
-      'Success',
-      'Your pet has been added successfully!',
-      [
-        { 
-          text: 'OK', 
-          onPress: () => router.back()
-        }
-      ]
-    );
+    if (!supabase) {
+      Alert.alert('Error', 'Database connection not available');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      // Get current user
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      
+      if (userError || !user) {
+        Alert.alert('Error', 'You must be logged in to add a pet');
+        return;
+      }
+
+      // Create pet record
+      const { data, error } = await supabase
+        .from('pets')
+        .insert({
+          name: petName,
+          breed: petBreed,
+          age: parseInt(petAge) || 0,
+          gender: petGender.toLowerCase(),
+          size: 'medium', // Default size
+          color: '',
+          location: petLocation || 'Unknown',
+          description: petDescription || `Meet ${petName}, a wonderful ${petBreed}!`,
+          personality: ['Friendly', 'Playful'], // Default personality traits
+          health_status: 'healthy',
+          images: selectedImages.length > 0 ? selectedImages : ['https://images.pexels.com/photos/1108099/pexels-photo-1108099.jpeg'], // Default image
+          adoption_status: 'available',
+          owner_id: user.id,
+          created_at: new Date().toISOString()
+        })
+        .select();
+
+      if (error) {
+        console.error('Error creating pet:', error);
+        Alert.alert('Error', 'Failed to add pet. Please try again.');
+        return;
+      }
+
+      Alert.alert(
+        'Success',
+        'Your pet has been added successfully!',
+        [
+          { 
+            text: 'OK', 
+            onPress: () => router.back()
+          }
+        ]
+      );
+
+    } catch (error) {
+      console.error('Error in handleSavePet:', error);
+      Alert.alert('Error', 'An unexpected error occurred');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const genderOptions = ['Male', 'Female'];
@@ -204,11 +256,21 @@ export default function AddPetScreen() {
 
         {/* Action Buttons */}
         <View style={styles.actionContainer}>
-          <TouchableOpacity style={styles.saveButton} onPress={handleSavePet}>
-            <Text style={styles.saveButtonText}>Save Pet</Text>
+          <TouchableOpacity 
+            style={[styles.saveButton, loading && styles.saveButtonDisabled]} 
+            onPress={handleSavePet}
+            disabled={loading}
+          >
+            <Text style={styles.saveButtonText}>
+              {loading ? 'Saving Pet...' : 'Save Pet'}
+            </Text>
           </TouchableOpacity>
           
-          <TouchableOpacity style={styles.cancelButton} onPress={handleBack}>
+          <TouchableOpacity 
+            style={styles.cancelButton} 
+            onPress={handleBack}
+            disabled={loading}
+          >
             <Text style={styles.cancelButtonText}>Cancel</Text>
           </TouchableOpacity>
         </View>
@@ -401,6 +463,10 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontFamily: 'Poppins-SemiBold',
     color: 'white',
+  },
+  saveButtonDisabled: {
+    backgroundColor: '#999',
+    opacity: 0.6,
   },
   cancelButton: {
     borderWidth: 1,

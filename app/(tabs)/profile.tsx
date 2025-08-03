@@ -1,21 +1,121 @@
-import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { User, Settings, Heart, Plus, MapPin, Phone, Mail, Calendar, CreditCard as Edit3 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useState, useEffect } from 'react';
+import { databaseService, supabase, UserProfile, Pet } from '../../lib/supabase';
+import AnimatedLoader from '../../components/AnimatedLoader';
 
 export default function ProfileScreen() {
   const router = useRouter();
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [userPets, setUserPets] = useState<Pet[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({
+    liked: 0,
+    myPets: 0,
+    nearby: 0
+  });
   
-  const userPets = [
+  useEffect(() => {
+    loadProfileData();
+  }, []);
+
+  const loadProfileData = async () => {
+    try {
+      setLoading(true);
+      
+      if (!supabase) {
+        // If Supabase not configured, show default data
+        setUserProfile(null);
+        setUserPets([]);
+        return;
+      }
+      
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setUserProfile(null);
+        setUserPets([]);
+        return;
+      }
+
+      // Load user profile - using direct supabase call since getUserProfile may not be exported
+      try {
+        const { data: profileData } = await supabase
+          .from('user_profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single();
+        
+        setUserProfile(profileData as unknown as UserProfile);
+      } catch (profileError) {
+        console.log('Profile not found, user may need to complete setup');
+        setUserProfile(null);
+      }
+
+      // Load user's pets
+      const pets = await databaseService.getUserPets(user.id);
+      setUserPets(pets);
+
+      // Load user's favorites for stats
+      const favorites = await databaseService.getUserFavorites(user.id);
+      
+      // Calculate nearby pets (simplified - using available pets count)
+      const availablePets = await databaseService.getAvailablePets(10);
+      
+      setStats({
+        liked: favorites.length,
+        myPets: pets.length,
+        nearby: availablePets.length
+      });
+
+    } catch (error) {
+      console.error('Error loading profile data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fallback data when not authenticated or no database
+  const fallbackProfile = {
+    full_name: 'Yousuf Fahim',
+    email: 'yousuf.fahim@email.com',
+    phone: '+880 1706-561532',
+    location: 'Mirpur, Dhaka',
+    avatar_url: 'https://i.postimg.cc/NjFjx6M3/fahim.jpg',
+    created_at: '2025-03-01'
+  };
+
+  const fallbackPets = [
     {
       id: '1',
       name: 'Peu',
       breed: 'Persian',
-      age: '1 year',
-      image: 'https://i.postimg.cc/rwPDrn80/Peu.jpg',
-    },
+      age: 1,
+      gender: 'male' as const,
+      size: 'medium' as const,
+      color: 'Gray',
+      personality: ['friendly'],
+      description: 'A lovely Persian cat',
+      images: ['https://i.postimg.cc/rwPDrn80/Peu.jpg'],
+      location: 'Dhaka',
+      shelter_id: 'user',
+      available: true,
+      health_status: 'healthy',
+      vaccination_status: 'up_to_date',
+      spayed_neutered: true,
+      good_with_kids: true,
+      good_with_pets: true,
+      energy_level: 'medium',
+      created_at: '2025-01-01',
+      updated_at: '2025-01-01'
+    }
   ];
+
+  const displayProfile = userProfile || fallbackProfile;
+  const displayPets = userPets.length > 0 ? userPets : fallbackPets;
+  const displayStats = userProfile ? stats : { liked: 23, myPets: 1, nearby: 5 };
 
   const handleEditProfile = () => {
     router.push('/profile/edit' as any);
@@ -41,6 +141,17 @@ export default function ProfileScreen() {
     router.push('/profile/account-settings' as any);
   };
 
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <AnimatedLoader variant="dots" />
+          <Text style={styles.loadingText}>Loading profile...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false}>
@@ -51,15 +162,15 @@ export default function ProfileScreen() {
           <View style={styles.profileHeader}>
             <View style={styles.avatarContainer}>
               <Image
-                source={{ uri: 'https://i.postimg.cc/NjFjx6M3/fahim.jpg' }}
+                source={{ uri: displayProfile.avatar_url || 'https://i.postimg.cc/NjFjx6M3/fahim.jpg' }}
                 style={styles.avatar}
               />
               <TouchableOpacity style={styles.editButton} onPress={handleEditProfile}>
                 <Edit3 size={16} color="white" />
               </TouchableOpacity>
             </View>
-            <Text style={styles.userName}>Yousuf Fahim</Text>
-            <Text style={styles.userLocation}>Mirpur, Dhaka</Text>
+            <Text style={styles.userName}>{displayProfile.full_name || 'Pet Lover'}</Text>
+            <Text style={styles.userLocation}>{displayProfile.location || 'Location not set'}</Text>
           </View>
         </LinearGradient>
 
@@ -67,17 +178,17 @@ export default function ProfileScreen() {
           <View style={styles.statsContainer}>
             <View style={styles.statItem}>
               <Heart size={24} color="#FF6F61" />
-              <Text style={styles.statNumber}>23</Text>
+              <Text style={styles.statNumber}>{displayStats.liked}</Text>
               <Text style={styles.statLabel}>Liked</Text>
             </View>
             <View style={styles.statItem}>
               <User size={24} color="#FF6F61" />
-              <Text style={styles.statNumber}>1</Text>
+              <Text style={styles.statNumber}>{displayStats.myPets}</Text>
               <Text style={styles.statLabel}>My Pets</Text>
             </View>
             <View style={styles.statItem}>
               <MapPin size={24} color="#FF6F61" />
-              <Text style={styles.statNumber}>5</Text>
+              <Text style={styles.statNumber}>{displayStats.nearby}</Text>
               <Text style={styles.statLabel}>Nearby</Text>
             </View>
           </View>
@@ -90,12 +201,15 @@ export default function ProfileScreen() {
               </TouchableOpacity>
             </View>
             
-            {userPets.map((pet) => (
+            {displayPets.map((pet) => (
               <TouchableOpacity key={pet.id} style={styles.petCard} onPress={() => handleViewPet(pet.id)}>
-                <Image source={{ uri: Array.isArray(pet.image) ? pet.image[0] : pet.image }} style={styles.petImage} />
+                <Image 
+                  source={{ uri: Array.isArray(pet.images) ? pet.images[0] : pet.images || 'https://i.postimg.cc/rwPDrn80/Peu.jpg' }} 
+                  style={styles.petImage} 
+                />
                 <View style={styles.petInfo}>
                   <Text style={styles.petName}>{pet.name}</Text>
-                  <Text style={styles.petDetails}>{pet.breed} • {pet.age}</Text>
+                  <Text style={styles.petDetails}>{pet.breed} • {pet.age} year{pet.age !== 1 ? 's' : ''}</Text>
                 </View>
                 <TouchableOpacity 
                   style={styles.editPetButton} 
@@ -114,15 +228,17 @@ export default function ProfileScreen() {
             <Text style={styles.sectionTitle}>Contact Information</Text>
             <View style={styles.contactItem}>
               <Phone size={20} color="#666" />
-              <Text style={styles.contactText}>+880 1706-561532</Text>
+              <Text style={styles.contactText}>{displayProfile.phone || 'Phone not set'}</Text>
             </View>
             <View style={styles.contactItem}>
               <Mail size={20} color="#666" />
-              <Text style={styles.contactText}>yousuf.fahim@email.com</Text>
+              <Text style={styles.contactText}>{displayProfile.email || 'Email not set'}</Text>
             </View>
             <View style={styles.contactItem}>
               <Calendar size={20} color="#666" />
-              <Text style={styles.contactText}>Member since March 2025</Text>
+              <Text style={styles.contactText}>
+                Member since {displayProfile.created_at ? new Date(displayProfile.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : 'Recently'}
+              </Text>
             </View>
           </View>
 
@@ -315,5 +431,17 @@ const styles = StyleSheet.create({
     fontFamily: 'Nunito-Regular',
     color: '#333',
     marginLeft: 15,
+  },
+  loadingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 60,
+  },
+  loadingText: {
+    fontSize: 16,
+    fontFamily: 'Nunito-Regular',
+    color: '#666',
+    marginTop: 16,
   },
 });

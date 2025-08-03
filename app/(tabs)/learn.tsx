@@ -1,6 +1,6 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Image, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'expo-router';
 import { 
   Search, 
@@ -20,6 +20,7 @@ import {
 import { learningCategories, mockLearningArticles, getFeaturedArticles } from '@/data/learningContent';
 import { LinearGradient } from 'expo-linear-gradient';
 import AnimatedButton from '@/components/AnimatedButton';
+import { databaseService, supabase, LearningArticle } from '@/lib/supabase';
 
 // Icon mapping for category icons
 const iconMap: Record<string, LucideIcon> = {
@@ -35,12 +36,31 @@ export default function LearnScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<typeof mockLearningArticles>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
   const featuredArticles = getFeaturedArticles();
   
   // Filter out pet-services from main categories - it will have its own section
   const mainCategories = learningCategories.filter(category => category.id !== 'pet-services');
   const petServicesCategory = learningCategories.find(category => category.id === 'pet-services');
+
+  useEffect(() => {
+    // Initialize database articles
+    const loadArticles = async () => {
+      try {
+        if (supabase) {
+          // Try to load articles from database
+          await databaseService.getPublishedArticles();
+        }
+      } catch (error) {
+        console.log('Using mock data for articles');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    loadArticles();
+  }, []);
 
   const handleSearch = (text: string) => {
     setSearchQuery(text);
@@ -239,8 +259,16 @@ export default function LearnScreen() {
           </View>
         )}
 
-        {/* Show regular content only when not searching */}
-        {!isSearching && (
+        {/* Loading State */}
+        {isLoading && (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#FF6B6B" />
+            <Text style={styles.loadingText}>Loading articles...</Text>
+          </View>
+        )}
+
+        {/* Show regular content only when not searching and not loading */}
+        {!isSearching && !isLoading && (
           <>
             {/* Featured Article */}
             <View style={styles.section}>
@@ -778,5 +806,16 @@ const styles = StyleSheet.create({
     fontFamily: 'Nunito-Regular',
     color: '#666',
     textAlign: 'center',
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 40,
+  },
+  loadingText: {
+    fontSize: 16,
+    fontFamily: 'Nunito-Regular',
+    color: '#666',
+    marginTop: 12,
   },
 });
