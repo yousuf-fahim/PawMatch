@@ -5,60 +5,23 @@ import { useRouter } from 'expo-router';
 import { 
   ArrowLeft, 
   Bell, 
-  Moon, 
-  Globe, 
-  Shield, 
   Smartphone, 
-  Eye, 
-  Download,
-  ChevronRight,
-  Palette,
   Volume2,
-  Camera
+  ChevronRight
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
 export default function AppSettingsScreen() {
   const router = useRouter();
   const [pushNotifications, setPushNotifications] = useState(true);
-  const [darkMode, setDarkMode] = useState(false);
   const [soundEffects, setSoundEffects] = useState(true);
   const [hapticFeedback, setHapticFeedback] = useState(true);
-  const [autoDownload, setAutoDownload] = useState(false);
-  const [saveToPhotos, setSaveToPhotos] = useState(true);
 
   const handleBack = () => {
     router.back();
   };
 
   const settingSections = [
-    {
-      title: 'Display & Appearance',
-      items: [
-        {
-          icon: Moon,
-          label: 'Dark Mode',
-          type: 'toggle',
-          value: darkMode,
-          onToggle: setDarkMode,
-          description: 'Switch to dark theme'
-        },
-        {
-          icon: Palette,
-          label: 'Theme Color',
-          type: 'navigation',
-          value: 'Default Red',
-          onPress: () => console.log('Theme color pressed')
-        },
-        {
-          icon: Eye,
-          label: 'Font Size',
-          type: 'navigation',
-          value: 'Medium',
-          onPress: () => console.log('Font size pressed')
-        }
-      ]
-    },
     {
       title: 'Notifications',
       items: [
@@ -90,50 +53,6 @@ export default function AppSettingsScreen() {
           value: hapticFeedback,
           onToggle: setHapticFeedback,
           description: 'Vibrate on touch interactions'
-        }
-      ]
-    },
-    {
-      title: 'Content & Media',
-      items: [
-        {
-          icon: Download,
-          label: 'Auto-download Images',
-          type: 'toggle',
-          value: autoDownload,
-          onToggle: setAutoDownload,
-          description: 'Download images on WiFi only'
-        },
-        {
-          icon: Camera,
-          label: 'Save to Photos',
-          type: 'toggle',
-          value: saveToPhotos,
-          onToggle: setSaveToPhotos,
-          description: 'Save pet photos to camera roll'
-        }
-      ]
-    },
-    {
-      title: 'Language & Region',
-      items: [
-        {
-          icon: Globe,
-          label: 'Language',
-          type: 'navigation',
-          value: 'English',
-          onPress: () => console.log('Language pressed')
-        }
-      ]
-    },
-    {
-      title: 'Privacy & Security',
-      items: [
-        {
-          icon: Shield,
-          label: 'Privacy Settings',
-          type: 'navigation',
-          onPress: () => console.log('Privacy pressed')
         }
       ]
     }

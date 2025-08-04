@@ -2,7 +2,7 @@ import { View, Text, Image, StyleSheet, Dimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { TouchableOpacity } from 'react-native-gesture-handler';
-import { Heart, User, Users } from 'lucide-react-native';
+import { Heart, User } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 
@@ -21,10 +21,6 @@ export default function SplashScreen() {
 
   const handleGetStarted = () => {
     router.push('/auth');
-  };
-
-  const handleGuest = () => {
-    router.push('/(tabs)');
   };
 
   return (
@@ -47,11 +43,6 @@ export default function SplashScreen() {
               <TouchableOpacity style={styles.primaryButton} onPress={handleGetStarted}>
                 <User size={20} color="white" />
                 <Text style={styles.primaryButtonText}>Get Started</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity style={styles.secondaryButton} onPress={handleGuest}>
-                <Users size={20} color="#FF6B6B" />
-                <Text style={styles.secondaryButtonText}>Continue as Guest</Text>
               </TouchableOpacity>
             </View>
           )}

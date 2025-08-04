@@ -181,7 +181,8 @@ export default function DashboardPage() {
   const quickActions = [
     { name: 'Manage Pets', href: '/pets', icon: PawPrint, color: 'bg-blue-500' },
     { name: 'User Management', href: '/users', icon: Users, color: 'bg-green-500' },
-    { name: 'Shelter Management', href: '/shelters', icon: Building, color: 'bg-indigo-500' },
+    { name: 'Admin Management', href: '/admins', icon: Shield, color: 'bg-purple-600' },
+    { name: 'Pet Services Management', href: '/services', icon: Building, color: 'bg-indigo-500' },
     { name: 'Article Management', href: '/content/articles', icon: BookOpen, color: 'bg-purple-500' },
     { name: 'Analytics', href: '/analytics', icon: BarChart3, color: 'bg-orange-500' },
   ]

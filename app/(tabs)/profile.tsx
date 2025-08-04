@@ -1,10 +1,10 @@
 import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { User, Settings, Heart, Plus, MapPin, Phone, Mail, Calendar, CreditCard as Edit3 } from 'lucide-react-native';
+import { User, Settings, Heart, Plus, MapPin, Phone, Mail, Calendar, Edit, LogOut } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useState, useEffect } from 'react';
-import { databaseService, supabase, UserProfile, Pet } from '../../lib/supabase';
+import { databaseService, supabase, UserProfile, Pet, authService } from '../../lib/supabase';
 import AnimatedLoader from '../../components/AnimatedLoader';
 
 export default function ProfileScreen() {
@@ -79,12 +79,12 @@ export default function ProfileScreen() {
 
   // Fallback data when not authenticated or no database
   const fallbackProfile = {
-    full_name: 'Yousuf Fahim',
-    email: 'yousuf.fahim@email.com',
-    phone: '+880 1706-561532',
-    location: 'Mirpur, Dhaka',
-    avatar_url: 'https://i.postimg.cc/NjFjx6M3/fahim.jpg',
-    created_at: '2025-03-01'
+    full_name: 'Pet Lover',
+    location: 'Location not set',
+    phone: 'Phone not set',
+    email: 'user@example.com',
+    avatar_url: null, // Remove stock image
+    created_at: new Date().toISOString(),
   };
 
   const fallbackPets = [
@@ -130,7 +130,7 @@ export default function ProfileScreen() {
   };
 
   const handleViewPet = (petId: string) => {
-    router.push(`/pet/${petId}?owner=true` as any);
+    router.push(`/pet-details/${petId}` as any);
   };
 
   const handleAppSettings = () => {
@@ -139,6 +139,34 @@ export default function ProfileScreen() {
 
   const handleAccountSettings = () => {
     router.push('/profile/account-settings' as any);
+  };
+
+  const handleLogout = async () => {
+    Alert.alert(
+      'Logout',
+      'Are you sure you want to logout?',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Logout',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              if (supabase) {
+                await authService.signOut();
+              }
+              router.replace('/auth' as any);
+            } catch (error) {
+              console.error('Logout error:', error);
+              Alert.alert('Error', 'Failed to logout. Please try again.');
+            }
+          },
+        },
+      ]
+    );
   };
 
   if (loading) {
@@ -161,12 +189,18 @@ export default function ProfileScreen() {
         >
           <View style={styles.profileHeader}>
             <View style={styles.avatarContainer}>
-              <Image
-                source={{ uri: displayProfile.avatar_url || 'https://i.postimg.cc/NjFjx6M3/fahim.jpg' }}
-                style={styles.avatar}
-              />
+              {displayProfile.avatar_url ? (
+                <Image
+                  source={{ uri: displayProfile.avatar_url }}
+                  style={styles.avatar}
+                />
+              ) : (
+                <View style={styles.defaultAvatar}>
+                  <User size={40} color="#4ECDC4" />
+                </View>
+              )}
               <TouchableOpacity style={styles.editButton} onPress={handleEditProfile}>
-                <Edit3 size={16} color="white" />
+                <Edit size={16} color="white" />
               </TouchableOpacity>
             </View>
             <Text style={styles.userName}>{displayProfile.full_name || 'Pet Lover'}</Text>
@@ -218,7 +252,7 @@ export default function ProfileScreen() {
                     handleEditPet(pet.id);
                   }}
                 >
-                  <Edit3 size={16} color="#666" />
+                  <Edit size={16} color="#666" />
                 </TouchableOpacity>
               </TouchableOpacity>
             ))}
@@ -252,6 +286,10 @@ export default function ProfileScreen() {
               <User size={20} color="#666" />
               <Text style={styles.settingText}>Account Settings</Text>
             </TouchableOpacity>
+            <TouchableOpacity style={[styles.settingItem, styles.logoutItem]} onPress={handleLogout}>
+              <LogOut size={20} color="#FF6B6B" />
+              <Text style={[styles.settingText, styles.logoutText]}>Logout</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </ScrollView>
@@ -281,6 +319,16 @@ const styles = StyleSheet.create({
     borderRadius: 50,
     borderWidth: 4,
     borderColor: 'white',
+  },
+  defaultAvatar: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    borderWidth: 4,
+    borderColor: 'white',
+    backgroundColor: '#f0f0f0',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   editButton: {
     position: 'absolute',
@@ -443,5 +491,14 @@ const styles = StyleSheet.create({
     fontFamily: 'Nunito-Regular',
     color: '#666',
     marginTop: 16,
+  },
+  logoutItem: {
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 107, 107, 0.2)',
+    marginTop: 10,
+  },
+  logoutText: {
+    color: '#FF6B6B',
+    fontFamily: 'Nunito-SemiBold',
   },
 });

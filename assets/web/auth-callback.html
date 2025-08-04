@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PawMatch Auth Callback</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+      padding: 20px;
+      background-color: #f9f9f9;
+      color: #333;
+      text-align: center;
+    }
+    
+    .container {
+      max-width: 600px;
+      background-color: white;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      padding: 30px;
+    }
+    
+    h1 {
+      color: #FF6B6B;
+      margin-bottom: 20px;
+    }
+    
+    .loader {
+      display: inline-block;
+      width: 30px;
+      height: 30px;
+      border: 3px solid rgba(255,107,107,0.3);
+      border-radius: 50%;
+      border-top-color: #FF6B6B;
+      animation: spin 1s ease-in-out infinite;
+      margin-bottom: 20px;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    
+    .debug-info {
+      margin-top: 20px;
+      text-align: left;
+      background-color: #f5f5f5;
+      border-radius: 8px;
+      padding: 15px;
+      font-family: monospace;
+      font-size: 12px;
+      overflow: auto;
+      max-height: 200px;
+      word-break: break-all;
+    }
+    
+    .port-info {
+      font-weight: bold;
+      margin-top: 10px;
+      padding: 8px;
+      background-color: #f8f0e3;
+      border-radius: 6px;
+      display: inline-block;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="loader"></div>
+    <h1>PawMatch Authentication</h1>
+    <p>Processing authentication and fixing port redirect issues...</p>
+    <p id="message">Verifying your credentials...</p>
+    
+    <div class="port-info" id="port-info">Current port: detecting...</div>
+    
+    <div class="debug-info" id="debug-info">Loading debug information...</div>
+  </div>
+  
+  <script>
+    // Get current port for debugging
+    const currentPort = window.location.port || "(default)";
+    document.getElementById('port-info').textContent = `Current port: ${currentPort}`;
+    
+    // Initialize debug element
+    const debugEl = document.getElementById('debug-info');
+    const messageEl = document.getElementById('message');
+    
+    // Debug logging helper
+    function log(message, data = null) {
+      const timestamp = new Date().toISOString().split('T')[1].split('.')[0];
+      const logEntry = document.createElement('div');
+      
+      if (data) {
+        console.log(`[${timestamp}] ${message}`, data);
+        logEntry.innerHTML = `<strong>[${timestamp}]</strong> ${message}: ${JSON.stringify(data)}`;
+      } else {
+        console.log(`[${timestamp}] ${message}`);
+        logEntry.innerHTML = `<strong>[${timestamp}]</strong> ${message}`;
+      }
+      
+      debugEl.appendChild(logEntry);
+    }
+    
+    // Process the authentication callback
+    async function processAuth() {
+      try {
+        log('Starting auth callback processing');
+        log('URL', window.location.href);
+        
+        // Extract auth parameters from URL
+        const hash = window.location.hash.substring(1);
+        const query = window.location.search.substring(1);
+        
+        // Parse hash parameters (for token response)
+        const hashParams = hash.split('&').reduce((params, pair) => {
+          if (!pair) return params;
+          const [key, value] = pair.split('=');
+          if (key) params[key] = decodeURIComponent(value || '');
+          return params;
+        }, {});
+        
+        // Parse query parameters (for code response)
+        const queryParams = new URLSearchParams(window.location.search);
+        
+        log('Hash params', hashParams);
+        log('Query params', Object.fromEntries(queryParams.entries()));
+        
+        // Check for access token in hash (token flow)
+        if (hashParams.access_token) {
+          log('Found access token', { 
+            type: hashParams.token_type,
+            expires_in: hashParams.expires_in
+          });
+          
+          messageEl.textContent = 'Authentication successful! Storing tokens...';
+          
+          // Store the tokens in localStorage
+          try {
+            localStorage.setItem('supabase.auth.token', JSON.stringify({
+              access_token: hashParams.access_token,
+              refresh_token: hashParams.refresh_token,
+              expires_in: parseInt(hashParams.expires_in || '0'),
+              expires_at: hashParams.expires_at,
+              token_type: hashParams.token_type || 'bearer'
+            }));
+            
+            log('Stored tokens in localStorage');
+            
+            // Store provider tokens if available
+            if (hashParams.provider_token) {
+              localStorage.setItem('supabase.auth.provider_token', hashParams.provider_token);
+              log('Stored provider token');
+            }
+            
+            if (hashParams.provider_refresh_token) {
+              localStorage.setItem('supabase.auth.provider_refresh_token', hashParams.provider_refresh_token);
+              log('Stored provider refresh token');
+            }
+          } catch (e) {
+            log('Error storing tokens', e.message);
+          }
+          
+          // Redirect to the app on the correct port
+          messageEl.textContent = 'Authentication successful! Redirecting...';
+          
+          setTimeout(() => {
+            // Get the current origin with port
+            const origin = window.location.origin;
+            log('Redirecting to origin', origin);
+            
+            // Redirect to the main page
+            window.location.href = origin;
+          }, 1500);
+        }
+        // Check for code in query params (code flow)
+        else if (queryParams.has('code')) {
+          const code = queryParams.get('code');
+          log('Found authorization code', { code: code.substring(0, 10) + '...' });
+          
+          messageEl.textContent = 'Authorization code received. Processing...';
+          
+          // Store the code in localStorage for the app to use
+          try {
+            localStorage.setItem('supabase.auth.code', code);
+            log('Stored code in localStorage');
+            
+            // Also store state if present
+            if (queryParams.has('state')) {
+              localStorage.setItem('supabase.auth.state', queryParams.get('state'));
+              log('Stored state parameter', { state: queryParams.get('state') });
+            }
+          } catch (e) {
+            log('Error storing code', e.message);
+          }
+          
+          // Redirect to the app on the correct port
+          messageEl.textContent = 'Authorization successful! Redirecting...';
+          
+          setTimeout(() => {
+            // Get the current origin with port
+            const origin = window.location.origin;
+            log('Redirecting to origin', origin);
+            
+            // Redirect to the main page
+            window.location.href = origin;
+          }, 1500);
+        }
+        // Check for errors
+        else if (queryParams.has('error')) {
+          const error = queryParams.get('error');
+          const errorDescription = queryParams.get('error_description') || 'Unknown error';
+          
+          log('Auth error', { error, errorDescription });
+          messageEl.textContent = `Error: ${errorDescription}`;
+          
+          // Still redirect after delay
+          setTimeout(() => {
+            window.location.href = window.location.origin;
+          }, 5000);
+        }
+        else {
+          log('No auth data found in URL');
+          messageEl.textContent = 'No authentication data found in URL.';
+          
+          // Redirect after delay
+          setTimeout(() => {
+            window.location.href = window.location.origin;
+          }, 3000);
+        }
+      } catch (error) {
+        log('Error processing auth', error.message);
+        messageEl.textContent = `Error: ${error.message}`;
+      }
+    }
+    
+    // Process auth when the page loads
+    window.onload = processAuth;
+  </script>
+</body>
+</html>

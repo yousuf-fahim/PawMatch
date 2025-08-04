@@ -102,11 +102,11 @@ export const mockPets = [
     breed: 'Persian',
     location: 'Mirpur, Dhaka',
     image: [
-      'https://i.postimg.cc/SKrr6bvQ/524633813-743262541767934-2267632741324460097-n.jpg', 
+      'https://i.postimg.cc/SKrr6bvQ/524633813-743262541767934-2267632741324460097-n.jpg',
       'https://i.postimg.cc/rwPDrn80/Peu.jpg',
-      'https://i.postimg.cc/pTcJSYvg/524379309-741998155220040-4901113047303928629-n.jpg', 
-      'https://i.postimg.cc/rmw9gZB1/523413172-1287359642971831-8976397684880539111-n.jpg', 
-      'https://i.postimg.cc/Y0JfrrhR/522867184-2462931890741988-4345646540119893060-n.jpg', 
+      'https://i.postimg.cc/pTcJSYvg/524379309-741998155220040-4901113047303928629-n.jpg',
+      'https://i.postimg.cc/rmw9gZB1/523413172-1287359642971831-8976397684880539111-n.jpg',
+      'https://i.postimg.cc/Y0JfrrhR/522867184-2462931890741988-4345646540119893060-n.jpg',
       'https://i.postimg.cc/FzfVXds1/518140056-537361346069335-246031076602927395-n.jpg'
     ],
     personality: ['Sassy', 'Energetic', 'Playful', 'Loyal? :3'],

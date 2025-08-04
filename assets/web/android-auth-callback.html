@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PawMatch Android Auth Processor</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background-color: #F7F8FA;
+      color: #333;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+      padding: 16px;
+      box-sizing: border-box;
+    }
+    .container {
+      background-color: white;
+      border-radius: 12px;
+      padding: 24px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+      max-width: 90%;
+      width: 500px;
+      text-align: center;
+    }
+    .logo {
+      margin-bottom: 24px;
+      font-size: 24px;
+      font-weight: bold;
+      color: #FF6B6B;
+    }
+    h1 {
+      font-size: 20px;
+      margin-bottom: 16px;
+    }
+    p {
+      font-size: 15px;
+      line-height: 1.5;
+      margin-bottom: 24px;
+    }
+    .status {
+      margin-top: 16px;
+      padding: 12px;
+      border-radius: 8px;
+      background-color: #f1f7fe;
+      font-size: 14px;
+      max-height: 150px;
+      overflow-y: auto;
+      text-align: left;
+    }
+    .error {
+      background-color: #fff0f0;
+      color: #e53e3e;
+    }
+    .loading-spinner {
+      border: 3px solid rgba(0, 0, 0, 0.1);
+      border-radius: 50%;
+      border-top: 3px solid #FF6B6B;
+      width: 24px;
+      height: 24px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .btn {
+      background-color: #FF6B6B;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 12px 24px;
+      font-size: 16px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+    .btn:hover {
+      background-color: #FF5A5A;
+    }
+    .debug-section {
+      margin-top: 24px;
+      text-align: left;
+      background-color: #f5f5f5;
+      padding: 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      max-height: 150px;
+      overflow-y: auto;
+    }
+    .debug-log {
+      margin: 4px 0;
+      font-family: monospace;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="logo">🐾 PawMatch</div>
+    <h1>Android Authentication Callback</h1>
+    <p>Please wait while we process your authentication...</p>
+    <div class="loading-spinner"></div>
+    <div id="status" class="status"></div>
+    
+    <div id="debug-section" class="debug-section">
+      <div class="debug-log">🔍 Debug Logs:</div>
+      <div id="debug-logs"></div>
+    </div>
+    
+    <div style="margin-top: 24px;">
+      <button id="closeButton" class="btn" style="display: none;">Return to App</button>
+      <button id="deepLinkButton" class="btn" style="display: none;">Open App via Deep Link</button>
+    </div>
+  </div>
+
+  <script>
+    // Debug logger function
+    function log(message, data) {
+      const logElement = document.getElementById('debug-logs');
+      const timestamp = new Date().toLocaleTimeString();
+      const logMessage = `[${timestamp}] ${message}`;
+      
+      console.log(logMessage, data);
+      
+      const logEntry = document.createElement('div');
+      logEntry.className = 'debug-log';
+      logEntry.textContent = logMessage + (data ? `: ${JSON.stringify(data)}` : '');
+      logElement.appendChild(logEntry);
+    }
+
+    // Update status message
+    function updateStatus(message, isError = false) {
+      const statusElement = document.getElementById('status');
+      statusElement.textContent = message;
+      statusElement.className = isError ? 'status error' : 'status';
+    }
+
+    // Process the authentication response
+    async function processAuth() {
+      try {
+        // Log the current URL for debugging
+        log('Processing URL', window.location.href);
+        
+        // Log the current origin
+        const currentOrigin = window.location.origin;
+        log('Current origin', currentOrigin);
+        
+        // Get hash and query parameters
+        const hash = window.location.hash;
+        const query = window.location.search;
+        
+        log('Hash', hash);
+        log('Query', query);
+        
+        // Check if there's an error in the URL
+        if (query.includes('error=') || hash.includes('error=')) {
+          const errorMessage = getParameterByName('error_description', query) || 
+                               getParameterByName('error_description', hash) ||
+                               'Authentication failed';
+          
+          log('Auth Error', errorMessage);
+          updateStatus(`Error: ${errorMessage}`, true);
+          showActionButtons();
+          return;
+        }
+        
+        // Check for access_token in hash or code in query
+        const accessToken = getParameterByName('access_token', hash);
+        const refreshToken = getParameterByName('refresh_token', hash);
+        const code = getParameterByName('code', query);
+        
+        if (accessToken) {
+          log('Found access token', { accessToken: 'present', refreshToken: refreshToken ? 'present' : 'missing' });
+          
+          // Store the tokens in localStorage for the app to use
+          try {
+            localStorage.setItem('supabase.auth.token', JSON.stringify({
+              access_token: accessToken,
+              refresh_token: refreshToken,
+              provider_token: getParameterByName('provider_token', hash),
+              token_type: getParameterByName('token_type', hash) || 'bearer'
+            }));
+            log('Stored tokens in localStorage');
+          } catch (e) {
+            log('Error storing tokens', e.message);
+          }
+          
+          updateStatus('Authentication successful! Use the button below to return to app...');
+          showActionButtons();
+        } 
+        else if (code) {
+          log('Found authorization code', { code: code.substring(0, 10) + '...' });
+          
+          // Store the code for the app to exchange
+          try {
+            localStorage.setItem('supabase.auth.code', code);
+            log('Stored auth code in localStorage');
+            
+            // Check for state parameter (CSRF protection)
+            const state = getParameterByName('state', query);
+            if (state) {
+              localStorage.setItem('supabase.auth.state', state);
+              log('Stored state parameter', { state });
+            }
+          } catch (e) {
+            log('Error storing code', e.message);
+          }
+          
+          updateStatus('Authorization code received! Use the button below to return to app...');
+          showActionButtons();
+        }
+        else {
+          // No token or code found
+          log('No auth data found in URL');
+          updateStatus('No authentication data found. Please try again.', true);
+          showActionButtons();
+        }
+      } catch (error) {
+        log('Error processing auth', error.message);
+        updateStatus(`Error: ${error.message}`, true);
+        showActionButtons();
+      }
+    }
+    
+    // Helper function to extract parameters from URL
+    function getParameterByName(name, url = '') {
+      if (!url) return null;
+      
+      name = name.replace(/[\[\]]/g, '\\$&');
+      const regex = new RegExp('[#&?]' + name + '(=([^&#]*)|&|#|$)');
+      const results = regex.exec(url);
+      
+      if (!results) return null;
+      if (!results[2]) return '';
+      
+      return decodeURIComponent(results[2].replace(/\+/g, ' '));
+    }
+    
+    // Show action buttons for returning to the app
+    function showActionButtons() {
+      // Close button for standard browser close
+      const closeButton = document.getElementById('closeButton');
+      closeButton.style.display = 'inline-block';
+      closeButton.addEventListener('click', () => {
+        try {
+          window.close();
+        } catch (e) {
+          log('Could not close window', e.message);
+          // If window.close() fails, try redirecting
+          const appOrigin = window.location.origin;
+          window.location.href = appOrigin;
+        }
+      });
+      
+      // Deep link button for reopening the app
+      const deepLinkButton = document.getElementById('deepLinkButton');
+      deepLinkButton.style.display = 'inline-block';
+      deepLinkButton.addEventListener('click', () => {
+        try {
+          // Try using a deep link to get back to the app
+          window.location.href = 'pawmatch://auth-callback';
+          log('Triggered deep link to app');
+          
+          // If deep link doesn't work, fall back to redirecting to Expo
+          setTimeout(() => {
+            log('Deep link may have failed, trying Expo URL');
+            // Use the IP address that matches your local network
+            window.location.href = 'exp://192.168.68.102:8081';
+          }, 1500);
+        } catch (e) {
+          log('Error with deep link', e.message);
+        }
+      });
+    }
+    
+    // Process authentication when the page loads
+    window.onload = processAuth;
+  </script>
+</body>
+</html>

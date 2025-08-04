@@ -50,10 +50,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!supabase) {
       throw new Error('Supabase client not available. Please configure your environment variables.')
     }
+    
+    // Get the appropriate redirect URL, with fallbacks
+    const redirectUrl = process.env.NEXT_PUBLIC_REDIRECT_URL || 
+                       `${window.location.origin}/auth/callback`;
+    
+    console.log('🔑 Signing in with Google, redirect URL:', redirectUrl);
+    
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
+        redirectTo: redirectUrl,
         queryParams: {
           access_type: 'offline',
           prompt: 'consent',

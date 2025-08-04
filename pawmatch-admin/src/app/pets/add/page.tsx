@@ -30,6 +30,7 @@ interface PetFormData {
   health_status: string
   adoption_fee: number
   images: File[]
+  species: string
 }
 
 const personalityOptions = [
@@ -54,16 +55,12 @@ export default function AddPetPage() {
     personality: [],
     health_status: 'healthy',
     adoption_fee: 0,
-    images: []
+    images: [],
+    species: 'Dog'
   })
   const [imagePreviewUrls, setImagePreviewUrls] = useState<string[]>([])
   const [errors, setErrors] = useState<Record<string, string>>({})
-
-  // Redirect if not admin
-  if (!isAdmin) {
-    router.push('/login')
-    return null
-  }
+  const [successMessage, setSuccessMessage] = useState<string | null>(null)
 
   const handleInputChange = (field: keyof PetFormData, value: any) => {
     setFormData(prev => ({
@@ -117,6 +114,7 @@ export default function AddPetPage() {
 
     if (!formData.name.trim()) newErrors.name = 'Pet name is required'
     if (!formData.breed.trim()) newErrors.breed = 'Breed is required'
+    if (!formData.species.trim()) newErrors.species = 'Species is required'
     if (!formData.location.trim()) newErrors.location = 'Location is required'
     if (!formData.description.trim()) newErrors.description = 'Description is required'
     if (formData.personality.length === 0) newErrors.personality = 'Select at least one personality trait'
@@ -129,26 +127,49 @@ export default function AddPetPage() {
   const uploadImages = async (): Promise<string[]> => {
     const uploadedUrls: string[] = []
     
-    for (const image of formData.images) {
-      const fileName = `pets/${Date.now()}-${Math.random()}.${image.name.split('.').pop()}`
+    try {
+      // First, check if the bucket exists and create it if not
+      const { data: buckets } = await supabase.storage.listBuckets();
+      const bucketExists = buckets?.some(bucket => bucket.name === 'pet-images');
       
-      const { data, error } = await supabase.storage
-        .from('pet-images')
-        .upload(fileName, image)
-
-      if (error) {
-        console.error('Error uploading image:', error)
-        throw new Error('Failed to upload images')
+      if (!bucketExists) {
+        // Create the bucket
+        const { error: createBucketError } = await supabase.storage.createBucket('pet-images', {
+          public: true,
+          fileSizeLimit: 5242880 // 5MB
+        });
+        
+        if (createBucketError) {
+          console.error('Error creating bucket:', createBucketError);
+          throw new Error('Failed to create storage bucket');
+        }
       }
+      
+      // Now proceed with uploads
+      for (const image of formData.images) {
+        const fileName = `pets/${Date.now()}-${Math.random()}.${image.name.split('.').pop()}`
+        
+        const { data, error } = await supabase.storage
+          .from('pet-images')
+          .upload(fileName, image)
 
-      const { data: { publicUrl } } = supabase.storage
-        .from('pet-images')
-        .getPublicUrl(fileName)
+        if (error) {
+          console.error('Error uploading image:', error)
+          throw new Error('Failed to upload images: ' + error.message)
+        }
 
-      uploadedUrls.push(publicUrl)
+        const { data: { publicUrl } } = supabase.storage
+          .from('pet-images')
+          .getPublicUrl(fileName)
+
+        uploadedUrls.push(publicUrl)
+      }
+    } catch (error) {
+      console.error('Error in image upload process:', error);
+      throw error;
     }
-
-    return uploadedUrls
+    
+    return uploadedUrls;
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -172,6 +193,7 @@ export default function AddPetPage() {
         .insert({
           name: formData.name,
           breed: formData.breed,
+          species: formData.species,
           age: formData.age,
           gender: formData.gender,
           size: formData.size,
@@ -182,7 +204,7 @@ export default function AddPetPage() {
           health_status: formData.health_status,
           adoption_fee: formData.adoption_fee,
           images: imageUrls,
-          adoption_status: 'available',
+          status: 'available',
           created_at: new Date().toISOString()
         })
         .select()
@@ -191,12 +213,35 @@ export default function AddPetPage() {
         throw error
       }
 
-      // Success - redirect to pets list
-      router.push('/pets?success=Pet added successfully')
+      // Success
+      setSuccessMessage('Pet added successfully!')
       
-    } catch (error) {
+      // Reset form
+      setFormData({
+        name: '',
+        breed: '',
+        age: 1,
+        gender: 'male',
+        size: 'medium',
+        color: '',
+        location: '',
+        description: '',
+        personality: [],
+        health_status: 'healthy',
+        adoption_fee: 0,
+        images: [],
+        species: 'Dog'
+      })
+      setImagePreviewUrls([])
+      
+      // Redirect after 2 seconds
+      setTimeout(() => {
+        router.push('/pets?success=Pet added successfully')
+      }, 2000)
+      
+    } catch (error: any) {
       console.error('Error creating pet:', error)
-      setErrors({ submit: 'Failed to create pet. Please try again.' })
+      setErrors({ submit: error.message || 'Failed to create pet. Please try again.' })
     } finally {
       setLoading(false)
       setImageUploading(false)
@@ -206,55 +251,303 @@ export default function AddPetPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-white shadow-sm border-b">
+      <div className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center space-x-4">
+          <div className="flex justify-between items-center py-4">
+            <div className="flex items-center gap-4">
               <button
-                onClick={() => router.back()}
-                className="p-2 rounded-md text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                onClick={() => router.push('/pets')}
+                className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
               >
-                <ArrowLeft className="h-5 w-5" />
+                <ArrowLeft className="w-5 h-5" />
+                <span>Back to Pets</span>
               </button>
-              <h1 className="text-xl font-semibold text-gray-900">Add New Pet</h1>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center">
+                  <Camera className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-2xl font-bold text-gray-900">Add New Pet</h1>
+                  <p className="text-sm text-gray-500">Create a new pet listing for adoption</p>
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Form */}
-      <div className="max-w-4xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
-        <form onSubmit={handleSubmit} className="space-y-8">
-          {/* Images Section */}
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <h2 className="text-lg font-medium text-gray-900 mb-4">Pet Photos</h2>
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Form Errors */}
+        {errors.submit && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700">
+            {errors.submit}
+          </div>
+        )}
+        
+        {/* Success Message */}
+        {successMessage && (
+          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-xl text-green-700">
+            {successMessage}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+          <div className="p-6 border-b border-gray-200">
+            <h2 className="text-lg font-medium text-gray-900">Pet Information</h2>
+            <p className="text-sm text-gray-500 mt-1">Basic details about the pet</p>
+          </div>
+          
+          <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6 border-b border-gray-200">
+            {/* Basic Info */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Pet Name
+              </label>
+              <input
+                type="text"
+                value={formData.name}
+                onChange={(e) => handleInputChange('name', e.target.value)}
+                className={`w-full border ${errors.name ? 'border-red-300' : 'border-gray-300'} rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                placeholder="Enter pet name"
+              />
+              {errors.name && (
+                <p className="mt-1 text-sm text-red-600">{errors.name}</p>
+              )}
+            </div>
             
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Species
+              </label>
+              <select
+                value={formData.species}
+                onChange={(e) => handleInputChange('species', e.target.value)}
+                className={`w-full border ${errors.species ? 'border-red-300' : 'border-gray-300'} rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500`}
+              >
+                <option value="Dog">Dog</option>
+                <option value="Cat">Cat</option>
+                <option value="Bird">Bird</option>
+                <option value="Small Mammal">Small Mammal</option>
+                <option value="Fish">Fish</option>
+                <option value="Reptile">Reptile</option>
+                <option value="Other">Other</option>
+              </select>
+              {errors.species && (
+                <p className="mt-1 text-sm text-red-600">{errors.species}</p>
+              )}
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Breed
+              </label>
+              <input
+                type="text"
+                value={formData.breed}
+                onChange={(e) => handleInputChange('breed', e.target.value)}
+                className={`w-full border ${errors.breed ? 'border-red-300' : 'border-gray-300'} rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                placeholder="Enter breed"
+              />
+              {errors.breed && (
+                <p className="mt-1 text-sm text-red-600">{errors.breed}</p>
+              )}
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Age (years)
+              </label>
+              <input
+                type="number"
+                min="0"
+                max="30"
+                step="0.1"
+                value={formData.age}
+                onChange={(e) => handleInputChange('age', parseFloat(e.target.value))}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Gender
+              </label>
+              <div className="flex gap-4 mt-2">
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    checked={formData.gender === 'male'}
+                    onChange={() => handleInputChange('gender', 'male')}
+                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                  />
+                  <span className="ml-2 text-sm text-gray-700">Male</span>
+                </label>
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    checked={formData.gender === 'female'}
+                    onChange={() => handleInputChange('gender', 'female')}
+                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                  />
+                  <span className="ml-2 text-sm text-gray-700">Female</span>
+                </label>
+              </div>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Size
+              </label>
+              <select
+                value={formData.size}
+                onChange={(e) => handleInputChange('size', e.target.value as any)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="small">Small</option>
+                <option value="medium">Medium</option>
+                <option value="large">Large</option>
+              </select>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Color
+              </label>
+              <input
+                type="text"
+                value={formData.color}
+                onChange={(e) => handleInputChange('color', e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Enter color(s)"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Location
+              </label>
+              <input
+                type="text"
+                value={formData.location}
+                onChange={(e) => handleInputChange('location', e.target.value)}
+                className={`w-full border ${errors.location ? 'border-red-300' : 'border-gray-300'} rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                placeholder="City, State"
+              />
+              {errors.location && (
+                <p className="mt-1 text-sm text-red-600">{errors.location}</p>
+              )}
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Health Status
+              </label>
+              <select
+                value={formData.health_status}
+                onChange={(e) => handleInputChange('health_status', e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="healthy">Healthy</option>
+                <option value="minor_issues">Minor Health Issues</option>
+                <option value="special_needs">Special Needs</option>
+                <option value="senior">Senior Care</option>
+              </select>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Adoption Fee ($)
+              </label>
+              <input
+                type="number"
+                min="0"
+                step="1"
+                value={formData.adoption_fee}
+                onChange={(e) => handleInputChange('adoption_fee', parseInt(e.target.value))}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          </div>
+          
+          {/* Personality Traits */}
+          <div className="p-6 border-b border-gray-200">
+            <label className="block text-sm font-medium text-gray-700 mb-3">
+              Personality Traits
+            </label>
+            {errors.personality && (
+              <p className="mb-3 text-sm text-red-600">{errors.personality}</p>
+            )}
+            <div className="flex flex-wrap gap-2">
+              {personalityOptions.map((trait) => (
+                <button
+                  key={trait}
+                  type="button"
+                  onClick={() => handlePersonalityToggle(trait)}
+                  className={`px-3 py-1 rounded-full text-sm font-medium ${
+                    formData.personality.includes(trait)
+                      ? 'bg-blue-100 text-blue-800 border-blue-200'
+                      : 'bg-gray-100 text-gray-800 border-gray-200'
+                  } border transition-colors`}
+                >
+                  {trait}
+                </button>
+              ))}
+            </div>
+          </div>
+          
+          {/* Description */}
+          <div className="p-6 border-b border-gray-200">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Description
+            </label>
+            <textarea
+              value={formData.description}
+              onChange={(e) => handleInputChange('description', e.target.value)}
+              rows={4}
+              className={`w-full border ${errors.description ? 'border-red-300' : 'border-gray-300'} rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500`}
+              placeholder="Describe the pet's story, characteristics, and any special needs"
+            ></textarea>
+            {errors.description && (
+              <p className="mt-1 text-sm text-red-600">{errors.description}</p>
+            )}
+          </div>
+          
+          {/* Image Upload */}
+          <div className="p-6 border-b border-gray-200">
+            <label className="block text-sm font-medium text-gray-700 mb-3">
+              Pet Photos
+            </label>
+            {errors.images && (
+              <p className="mb-3 text-sm text-red-600">{errors.images}</p>
+            )}
+            
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-4">
+              {/* Image Previews */}
               {imagePreviewUrls.map((url, index) => (
-                <div key={index} className="relative group">
-                  <img
-                    src={url}
-                    alt={`Pet image ${index + 1}`}
-                    className="w-full h-32 object-cover rounded-lg"
+                <div key={index} className="relative aspect-square rounded-lg overflow-hidden border border-gray-200">
+                  <img 
+                    src={url} 
+                    alt={`Pet preview ${index + 1}`}
+                    className="w-full h-full object-cover"
                   />
                   <button
                     type="button"
                     onClick={() => removeImage(index)}
-                    className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="absolute top-1 right-1 bg-white rounded-full p-1 shadow-md hover:bg-red-100"
                   >
-                    <X className="h-4 w-4" />
+                    <X className="w-4 h-4 text-red-600" />
                   </button>
                 </div>
               ))}
               
+              {/* Add Image Button */}
               {formData.images.length < 6 && (
-                <label className="border-2 border-dashed border-gray-300 rounded-lg p-4 h-32 flex flex-col items-center justify-center cursor-pointer hover:border-gray-400 transition-colors">
-                  <Camera className="h-8 w-8 text-gray-400 mb-2" />
-                  <span className="text-sm text-gray-600">Add Photo</span>
+                <label className="cursor-pointer aspect-square flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-500 transition-colors">
+                  <Upload className="w-6 h-6 text-gray-400 mb-2" />
+                  <span className="text-xs text-gray-500">Add Photo</span>
                   <input
                     type="file"
                     accept="image/*"
-                    multiple
                     onChange={handleImageUpload}
                     className="hidden"
                   />
@@ -262,234 +555,40 @@ export default function AddPetPage() {
               )}
             </div>
             
-            {errors.images && (
-              <p className="text-red-600 text-sm">{errors.images}</p>
-            )}
-            
-            <p className="text-sm text-gray-500">
-              Upload up to 6 photos. First image will be the main photo.
+            <p className="text-xs text-gray-500">
+              Upload up to 6 photos. First photo will be used as the main image.
             </p>
           </div>
-
-          {/* Basic Information */}
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <h2 className="text-lg font-medium text-gray-900 mb-4">Basic Information</h2>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Pet Name *
-                </label>
-                <input
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => handleInputChange('name', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="Enter pet name"
-                />
-                {errors.name && <p className="text-red-600 text-sm mt-1">{errors.name}</p>}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Breed *
-                </label>
-                <input
-                  type="text"
-                  value={formData.breed}
-                  onChange={(e) => handleInputChange('breed', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="e.g., Golden Retriever, Persian Cat"
-                />
-                {errors.breed && <p className="text-red-600 text-sm mt-1">{errors.breed}</p>}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Age (years)
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  max="30"
-                  value={formData.age}
-                  onChange={(e) => handleInputChange('age', parseInt(e.target.value))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Gender
-                </label>
-                <select
-                  value={formData.gender}
-                  onChange={(e) => handleInputChange('gender', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option value="male">Male</option>
-                  <option value="female">Female</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Size
-                </label>
-                <select
-                  value={formData.size}
-                  onChange={(e) => handleInputChange('size', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option value="small">Small</option>
-                  <option value="medium">Medium</option>
-                  <option value="large">Large</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Color
-                </label>
-                <input
-                  type="text"
-                  value={formData.color}
-                  onChange={(e) => handleInputChange('color', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="e.g., Golden, Black & White"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Location *
-                </label>
-                <input
-                  type="text"
-                  value={formData.location}
-                  onChange={(e) => handleInputChange('location', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="City, Country"
-                />
-                {errors.location && <p className="text-red-600 text-sm mt-1">{errors.location}</p>}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Adoption Fee ($)
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  value={formData.adoption_fee}
-                  onChange={(e) => handleInputChange('adoption_fee', parseFloat(e.target.value) || 0)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="0"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Personality Traits */}
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <h2 className="text-lg font-medium text-gray-900 mb-4">Personality Traits *</h2>
-            
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-              {personalityOptions.map((trait) => (
-                <button
-                  key={trait}
-                  type="button"
-                  onClick={() => handlePersonalityToggle(trait)}
-                  className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                    formData.personality.includes(trait)
-                      ? 'bg-blue-100 text-blue-800 border-2 border-blue-300'
-                      : 'bg-gray-100 text-gray-700 border-2 border-gray-200 hover:bg-gray-200'
-                  }`}
-                >
-                  {trait}
-                </button>
-              ))}
-            </div>
-            
-            {errors.personality && (
-              <p className="text-red-600 text-sm mt-2">{errors.personality}</p>
-            )}
-          </div>
-
-          {/* Description & Health */}
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <h2 className="text-lg font-medium text-gray-900 mb-4">Additional Information</h2>
-            
-            <div className="space-y-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Description *
-                </label>
-                <textarea
-                  value={formData.description}
-                  onChange={(e) => handleInputChange('description', e.target.value)}
-                  rows={4}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="Tell potential adopters about this pet's personality, habits, and special needs..."
-                />
-                {errors.description && <p className="text-red-600 text-sm mt-1">{errors.description}</p>}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Health Status
-                </label>
-                <select
-                  value={formData.health_status}
-                  onChange={(e) => handleInputChange('health_status', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option value="healthy">Healthy</option>
-                  <option value="needs_medical_attention">Needs Medical Attention</option>
-                  <option value="recovering">Recovering</option>
-                  <option value="special_needs">Special Needs</option>
-                </select>
-              </div>
-            </div>
-          </div>
-
-          {/* Submit Buttons */}
-          <div className="flex justify-end space-x-4">
+          
+          {/* Submit */}
+          <div className="p-6 flex justify-end">
             <button
               type="button"
-              onClick={() => router.back()}
-              className="px-6 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 focus:ring-2 focus:ring-blue-500"
-              disabled={loading}
+              onClick={() => router.push('/pets')}
+              className="mr-3 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
             >
               Cancel
             </button>
-            
             <button
               type="submit"
-              disabled={loading || imageUploading}
-              className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+              disabled={loading}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading || imageUploading ? (
+              {loading ? (
                 <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                  <span>{imageUploading ? 'Uploading Images...' : 'Creating Pet...'}</span>
+                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></div>
+                  {imageUploading ? 'Uploading Images...' : 'Saving...'}
                 </>
               ) : (
                 <>
-                  <Save className="h-4 w-4" />
-                  <span>Add Pet</span>
+                  <Save className="w-4 h-4 mr-2" />
+                  Save Pet
                 </>
               )}
             </button>
           </div>
-
-          {errors.submit && (
-            <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-md">
-              <p className="text-red-800">{errors.submit}</p>
-            </div>
-          )}
         </form>
-      </div>
+      </main>
     </div>
   )
 }

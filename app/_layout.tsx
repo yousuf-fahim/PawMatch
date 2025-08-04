@@ -1,9 +1,10 @@
 import { useEffect } from 'react';
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 import { useFonts } from 'expo-font';
+import { supabase, authService } from '@/lib/supabase';
 import {
   Poppins_400Regular,
   Poppins_500Medium,
@@ -22,6 +23,7 @@ SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   useFrameworkReady();
+  const router = useRouter();
 
   const [fontsLoaded, fontError] = useFonts({
     'Poppins-Regular': Poppins_400Regular,
@@ -39,6 +41,28 @@ export default function RootLayout() {
     }
   }, [fontsLoaded, fontError]);
 
+  // Listen for auth state changes
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('🔍 Auth state change:', event, session?.user?.email);
+      
+      if (event === 'SIGNED_IN' && session?.user) {
+        try {
+          // Create or update user profile
+          await authService.createOrUpdateProfile(session.user);
+          
+          // Navigate to main app
+          console.log('🔍 Redirecting to main app after successful OAuth');
+          router.replace('/(tabs)');
+        } catch (error) {
+          console.error('❌ Error handling auth state change:', error);
+        }
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [router]);
+
   if (!fontsLoaded && !fontError) {
     return null;
   }
@@ -48,6 +72,7 @@ export default function RootLayout() {
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" />
         <Stack.Screen name="auth" />
+        <Stack.Screen name="auth/callback" />
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="+not-found" />
       </Stack>

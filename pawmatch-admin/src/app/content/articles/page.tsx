@@ -75,7 +75,7 @@ export default function ArticlesManagementPage() {
   const loadArticles = async () => {
     try {
       const { data, error } = await supabase
-        .from('articles')
+        .from('learning_articles')
         .select('*')
         .order('created_at', { ascending: false })
 
@@ -115,7 +115,7 @@ export default function ArticlesManagementPage() {
   const togglePublished = async (articleId: string, currentStatus: boolean) => {
     try {
       const { error } = await supabase
-        .from('articles')
+        .from('learning_articles')
         .update({ 
           published: !currentStatus,
           updated_at: new Date().toISOString()
@@ -132,7 +132,7 @@ export default function ArticlesManagementPage() {
   const toggleFeatured = async (articleId: string, currentStatus: boolean) => {
     try {
       const { error } = await supabase
-        .from('articles')
+        .from('learning_articles')
         .update({ 
           featured: !currentStatus,
           updated_at: new Date().toISOString()
@@ -151,7 +151,7 @@ export default function ArticlesManagementPage() {
 
     try {
       const { error } = await supabase
-        .from('articles')
+        .from('learning_articles')
         .delete()
         .eq('id', articleId)
 
@@ -408,7 +408,7 @@ export default function ArticlesManagementPage() {
                       </button>
                       
                       <button
-                        onClick={() => router.push(`/content/articles/${article.id}/edit`)}
+                        onClick={() => router.push(`/content/articles/edit/${article.id}`)}
                         className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
                         title="Edit article"
                       >

@@ -1,119 +1,72 @@
-import { View, Text, StyleSheet, TextInput, Alert, Platform } from 'react-native';
+import { View, Text, StyleSheet, Alert, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { TouchableOpacity } from 'react-native-gesture-handler';
-import { Mail, Lock, ArrowLeft, Eye, EyeOff } from 'lucide-react-native';
+import { ArrowLeft, User } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Formik } from 'formik';
-import * as Yup from 'yup';
-import { supabase } from '../lib/supabase';
-
-const validationSchema = Yup.object().shape({
-  email: Yup.string().email('Invalid email').required('Email is required'),
-  password: Yup.string().min(6, 'Password must be at least 6 characters').required('Password is required'),
-});
+import { supabase, authService } from '../lib/supabase';
+// Import both direct auth for web and mobile auth for mobile
+import { DirectAuth } from '../lib/direct-auth';
+import { authenticateWithGoogle } from '../lib/mobile-auth-simple';
 
 export default function AuthScreen() {
   const router = useRouter();
-  const [isLogin, setIsLogin] = useState(true);
-  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleAuth = async (values: { email: string; password: string }) => {
-    if (!supabase) {
-      Alert.alert('Error', 'Authentication service not configured. Please check your setup.');
-      return;
-    }
-
+  const handleGoogleSignIn = async () => {
     try {
       setLoading(true);
+      setError(null);
       
-      if (isLogin) {
-        // Sign in existing user
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email: values.email,
-          password: values.password,
-        });
-
-        if (error) {
-          Alert.alert('Sign In Error', error.message);
-          return;
-        }
-
-        if (data.user) {
-          // Create or update user profile
-          await createOrUpdateUserProfile(data.user);
-          router.push('/(tabs)');
-        }
+      let result: any;
+      
+      if (Platform.OS === 'web') {
+        console.log('🔐 [Auth] Using DirectAuth for web platform');
+        result = await DirectAuth.signInWithGoogle();
       } else {
-        // Sign up new user
-        const { data, error } = await supabase.auth.signUp({
-          email: values.email,
-          password: values.password,
-        });
-
-        if (error) {
-          Alert.alert('Sign Up Error', error.message);
-          return;
-        }
-
-        if (data.user) {
-          Alert.alert('Success', 'Please check your email to confirm your account!');
-          // Create user profile
-          await createOrUpdateUserProfile(data.user);
-          setIsLogin(true);
-        }
+        console.log('🔐 [Auth] Using Mobile Auth for mobile platform');
+        result = await authenticateWithGoogle();
       }
-    } catch (error) {
-      console.error('Auth error:', error);
-      Alert.alert('Error', 'An unexpected error occurred. Please try again.');
+      
+      if (result && 'success' in result && result.success && result.user) {
+        console.log('🔐 [Auth] Authentication successful!', result.user.email);
+        router.replace('/(tabs)');
+      } else if (result && 'type' in result && result.type === 'success') {
+        console.log('🔐 [Auth] Web authentication successful!');
+        router.replace('/(tabs)');
+      } else {
+        const errorMessage = (result && 'error' in result) ? result.error : 'Authentication failed';
+        throw new Error(errorMessage);
+      }
+    } catch (error: any) {
+      console.error('🔐 [Auth] Sign in error:', error);
+      setError(error.message || 'Failed to sign in with Google');
     } finally {
       setLoading(false);
     }
   };
 
-  const createOrUpdateUserProfile = async (user: any) => {
-    if (!supabase) return;
-
+  const checkAuthStatus = async () => {
     try {
-      const { error } = await supabase
-        .from('user_profiles')
-        .upsert({
-          id: user.id,
-          email: user.email,
-          updated_at: new Date().toISOString(),
-        });
-
-      if (error) {
-        console.error('Profile creation error:', error);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        // User is authenticated, create profile and navigate
+        await authService.createOrUpdateProfile(session.user);
+        router.push('/(tabs)');
+      } else {
+        Alert.alert('Error', 'Sign in was not completed. Please try again.');
       }
     } catch (error) {
-      console.error('Profile creation error:', error);
+      console.error('Auth check error:', error);
+      Alert.alert('Error', 'Could not verify sign in status.');
     }
   };
 
-  const handleGoogleAuth = async () => {
-    if (!supabase) {
-      Alert.alert('Error', 'Authentication service not configured.');
-      return;
-    }
-
-    try {
-      setLoading(true);
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-      });
-
-      if (error) {
-        Alert.alert('Google Sign In Error', error.message);
-      }
-    } catch (error) {
-      console.error('Google auth error:', error);
-      Alert.alert('Error', 'Google sign in failed. Please try again.');
-    } finally {
-      setLoading(false);
-    }
+  const handleGuestMode = () => {
+    // Navigate to main app without authentication
+    router.push('/(tabs)');
   };
 
   return (
@@ -127,95 +80,53 @@ export default function AuthScreen() {
         </TouchableOpacity>
 
         <View style={styles.content}>
-          <Text style={styles.title}>
-            {isLogin ? 'Welcome Back!' : 'Create Account'}
-          </Text>
-          <Text style={styles.subtitle}>
-            {isLogin ? 'Sign in to continue' : 'Join PawMatch today'}
-          </Text>
+          <Text style={styles.title}>Welcome to PawMatch!</Text>
+          <Text style={styles.subtitle}>Find your perfect furry companion</Text>
 
-          <Formik
-            initialValues={{ email: '', password: '' }}
-            validationSchema={validationSchema}
-            onSubmit={handleAuth}
-          >
-            {({ handleChange, handleBlur, handleSubmit, values, errors, touched }) => (
-              <View style={styles.form}>
-                <View style={styles.inputContainer}>
-                  <Mail size={20} color="#FF6B6B" />
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Email"
-                    placeholderTextColor="#999"
-                    value={values.email}
-                    onChangeText={handleChange('email')}
-                    onBlur={handleBlur('email')}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                  />
+          {error && (
+            <View style={styles.errorContainer}>
+              <Text style={styles.errorText}>{error}</Text>
+            </View>
+          )}
+
+          <View style={styles.authOptions}>
+            {/* Google Sign In Button */}
+            <TouchableOpacity
+              style={[styles.socialButton, { opacity: loading ? 0.7 : 1 }]}
+              onPress={handleGoogleSignIn}
+              disabled={loading}
+            >
+              <View style={styles.socialButtonContent}>
+                <View style={styles.googleIcon}>
+                  <Text style={styles.googleIconText}>G</Text>
                 </View>
-                {touched.email && errors.email && (
-                  <Text style={styles.errorText}>{errors.email}</Text>
-                )}
-
-                <View style={styles.inputContainer}>
-                  <Lock size={20} color="#FF6B6B" />
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Password"
-                    placeholderTextColor="#999"
-                    value={values.password}
-                    onChangeText={handleChange('password')}
-                    onBlur={handleBlur('password')}
-                    secureTextEntry={!showPassword}
-                  />
-                  <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
-                    {showPassword ? (
-                      <EyeOff size={20} color="#999" />
-                    ) : (
-                      <Eye size={20} color="#999" />
-                    )}
-                  </TouchableOpacity>
-                </View>
-                {touched.password && errors.password && (
-                  <Text style={styles.errorText}>{errors.password}</Text>
-                )}
-
-                <TouchableOpacity 
-                  style={[styles.authButton, loading && styles.authButtonDisabled]} 
-                  onPress={() => handleSubmit()}
-                  disabled={loading}
-                >
-                  <Text style={styles.authButtonText}>
-                    {loading ? 'Please wait...' : (isLogin ? 'Sign In' : 'Create Account')}
-                  </Text>
-                </TouchableOpacity>
+                <Text style={styles.socialButtonText}>
+                  {loading ? 'Signing in...' : 'Continue with Google'}
+                </Text>
               </View>
-            )}
-          </Formik>
+            </TouchableOpacity>
 
-          <View style={styles.divider}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>OR</Text>
-            <View style={styles.dividerLine} />
+            {/* Or Divider */}
+            <View style={styles.divider}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerText}>OR</Text>
+              <View style={styles.dividerLine} />
+            </View>
+
+            {/* Guest Mode Button */}
+            <TouchableOpacity
+              style={styles.guestButton}
+              onPress={handleGuestMode}
+              disabled={loading}
+            >
+              <User size={20} color="#666" />
+              <Text style={styles.guestButtonText}>Continue as Guest</Text>
+            </TouchableOpacity>
           </View>
 
-          <TouchableOpacity 
-            style={[styles.socialButton, loading && styles.authButtonDisabled]} 
-            onPress={handleGoogleAuth}
-            disabled={loading}
-          >
-            <Text style={styles.socialButtonText}>Continue with Google</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity onPress={() => setIsLogin(!isLogin)}>
-            <Text style={styles.switchText}>
-              {isLogin ? "Don't have an account? " : "Already have an account? "}
-              <Text style={styles.switchLink}>
-                {isLogin ? 'Sign Up' : 'Sign In'}
-              </Text>
-            </Text>
-          </TouchableOpacity>
+          <Text style={styles.disclaimer}>
+            By continuing, you agree to our Terms of Service and Privacy Policy
+          </Text>
         </View>
       </SafeAreaView>
     </LinearGradient>
@@ -234,68 +145,86 @@ const styles = StyleSheet.create({
     top: 60,
     left: 20,
     zIndex: 1,
+    padding: 8,
   },
   content: {
     flex: 1,
     justifyContent: 'center',
-    paddingHorizontal: 20,
+    alignItems: 'center',
+    paddingHorizontal: 32,
   },
   title: {
     fontSize: 32,
-    fontFamily: 'Poppins-Bold',
+    fontWeight: 'bold',
     color: 'white',
     textAlign: 'center',
     marginBottom: 8,
   },
   subtitle: {
-    fontSize: 16,
-    fontFamily: 'Nunito-Regular',
+    fontSize: 18,
     color: 'rgba(255, 255, 255, 0.9)',
     textAlign: 'center',
-    marginBottom: 40,
+    marginBottom: 48,
   },
-  form: {
-    marginBottom: 30,
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'white',
-    paddingHorizontal: 15,
-    paddingVertical: 12,
-    borderRadius: 12,
-    marginBottom: 15,
-    gap: 12,
-  },
-  input: {
-    flex: 1,
-    fontSize: 16,
-    fontFamily: 'Nunito-Regular',
-    color: '#333',
+  errorContainer: {
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 20,
+    width: '100%',
   },
   errorText: {
-    color: 'white',
-    fontSize: 12,
-    fontFamily: 'Nunito-Regular',
-    marginBottom: 10,
-    marginTop: -10,
+    color: '#FF3B30',
+    fontSize: 14,
+    textAlign: 'center',
+    fontWeight: '500',
   },
-  authButton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.25)',
-    paddingVertical: 16,
+  authOptions: {
+    width: '100%',
+    maxWidth: 320,
+  },
+  socialButton: {
+    backgroundColor: 'white',
     borderRadius: 12,
-    alignItems: 'center',
-    marginTop: 10,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  authButtonText: {
+  socialButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  googleIcon: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#4285F4',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  googleIconText: {
     color: 'white',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
+  socialButtonText: {
     fontSize: 16,
-    fontFamily: 'Poppins-SemiBold',
+    fontWeight: '600',
+    color: '#333',
   },
   divider: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: 20,
+    marginVertical: 24,
   },
   dividerLine: {
     flex: 1,
@@ -305,33 +234,30 @@ const styles = StyleSheet.create({
   dividerText: {
     color: 'rgba(255, 255, 255, 0.8)',
     fontSize: 14,
-    fontFamily: 'Nunito-Regular',
-    paddingHorizontal: 15,
+    fontWeight: '500',
+    marginHorizontal: 16,
   },
-  socialButton: {
-    backgroundColor: 'white',
-    paddingVertical: 16,
-    borderRadius: 12,
+  guestButton: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
-  socialButtonText: {
-    color: '#FF6B6B',
+  guestButtonText: {
     fontSize: 16,
-    fontFamily: 'Poppins-SemiBold',
-  },
-  switchText: {
-    color: 'rgba(255, 255, 255, 0.9)',
-    fontSize: 14,
-    fontFamily: 'Nunito-Regular',
-    textAlign: 'center',
-    marginTop: 20,
-  },
-  switchLink: {
+    fontWeight: '600',
     color: 'white',
-    fontFamily: 'Nunito-Bold',
+    marginLeft: 8,
   },
-  authButtonDisabled: {
-    backgroundColor: 'rgba(255, 255, 255, 0.5)',
+  disclaimer: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.7)',
+    textAlign: 'center',
+    marginTop: 32,
+    lineHeight: 16,
   },
 });

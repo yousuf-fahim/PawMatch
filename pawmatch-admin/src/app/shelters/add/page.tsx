@@ -90,7 +90,7 @@ export default function AddShelterPage() {
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
 
-    if (!formData.name.trim()) newErrors.name = 'Shelter name is required';
+    if (!formData.name.trim()) newErrors.name = 'Service name is required';
     if (!formData.email.trim()) newErrors.email = 'Email is required';
     else if (!/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = 'Please enter a valid email';
     if (!formData.phone.trim()) newErrors.phone = 'Phone number is required';
@@ -156,7 +156,7 @@ export default function AddShelterPage() {
   };
 
   return (
-    <div className="p-6">
+    <div className="p-6 bg-white">
       {/* Header */}
       <div className="flex items-center gap-4 mb-8">
         <Link
@@ -166,8 +166,8 @@ export default function AddShelterPage() {
           <ArrowLeft size={20} />
         </Link>
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Add New Shelter</h1>
-          <p className="text-gray-600 mt-1">Register a new pet shelter in the system</p>
+          <h1 className="text-3xl font-bold text-gray-900">Add New Pet Service</h1>
+          <p className="text-gray-600 mt-1">Register a new pet service provider in the system</p>
         </div>
       </div>
 
@@ -181,7 +181,7 @@ export default function AddShelterPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
-                  Shelter Name *
+                  Service Name *
                 </label>
                 <input
                   type="text"
@@ -192,7 +192,7 @@ export default function AddShelterPage() {
                   className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
                     errors.name ? 'border-red-500' : 'border-gray-300'
                   }`}
-                  placeholder="Enter shelter name"
+                  placeholder="Enter service name"
                 />
                 {errors.name && <p className="text-red-500 text-sm mt-1">{errors.name}</p>}
               </div>

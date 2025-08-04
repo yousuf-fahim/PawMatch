@@ -6,7 +6,11 @@
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "verify-env": "node ./scripts/verify-env.js",
+    "update-redirect-urls": "node ./scripts/update-redirect-urls.js",
+    "setup": "npm run verify-env && npm run update-redirect-urls",
+    "debug": "npm run dev"
   },
   "dependencies": {
     "@supabase/auth-helpers-nextjs": "^0.10.0",
@@ -14,11 +18,13 @@
     "@supabase/auth-ui-shared": "^0.1.8",
     "@supabase/ssr": "^0.6.1",
     "@supabase/supabase-js": "^2.53.0",
+    "chalk": "^4.1.2",
+    "dotenv": "^16.6.1",
     "framer-motion": "^12.23.12",
     "lucide-react": "^0.536.0",
-    "next": "15.4.5",
-    "react": "19.1.0",
-    "react-dom": "19.1.0"
+    "next": "^15.4.5",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",

@@ -1,6 +1,26 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
+async function isPreAccessAdmin(email: string, supabase: any): Promise<boolean> {
+  try {
+    const { data, error } = await supabase
+      .from('pre_access_admins')
+      .select('email')
+      .eq('email', email)
+      .single();
+    
+    if (error) {
+      console.error('Error checking admin status:', error);
+      return false;
+    }
+    
+    return !!data;
+  } catch (error) {
+    console.error('Error in isPreAccessAdmin:', error);
+    return false;
+  }
+}
+
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({
     request: {
@@ -38,8 +58,11 @@ export async function middleware(request: NextRequest) {
   const protectedRoutes = ['/dashboard', '/pets', '/users', '/content', '/analytics']
   const isProtectedRoute = protectedRoutes.some(route => request.nextUrl.pathname.startsWith(route))
 
-  // Admin email check
-  const isAdmin = user?.email === process.env.ADMIN_EMAIL || user?.email === 'fahim.cse.bubt@gmail.com'
+  // Dynamic admin email check
+  let isAdmin = false;
+  if (user?.email) {
+    isAdmin = await isPreAccessAdmin(user.email, supabase) || user.email === process.env.NEXT_PUBLIC_ADMIN_EMAIL;
+  }
 
   // Redirect logic
   if (isProtectedRoute) {

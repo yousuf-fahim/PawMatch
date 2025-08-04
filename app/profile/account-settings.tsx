@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState } from 'react';
 import { useRouter } from 'expo-router';
@@ -8,43 +8,17 @@ import {
   Mail, 
   Phone, 
   MapPin, 
-  Lock, 
-  Eye, 
-  EyeOff,
-  Shield,
-  Trash2,
-  Download,
   LogOut,
   ChevronRight
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { signOut } from '../../lib/mobile-auth-simple';
 
 export default function AccountSettingsScreen() {
   const router = useRouter();
-  const [showPassword, setShowPassword] = useState(false);
-  const [currentPassword, setCurrentPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
 
   const handleBack = () => {
     router.back();
-  };
-
-  const handleChangePassword = () => {
-    if (!currentPassword || !newPassword || !confirmPassword) {
-      Alert.alert('Error', 'Please fill in all password fields');
-      return;
-    }
-    
-    if (newPassword !== confirmPassword) {
-      Alert.alert('Error', 'New passwords do not match');
-      return;
-    }
-    
-    Alert.alert('Success', 'Password changed successfully');
-    setCurrentPassword('');
-    setNewPassword('');
-    setConfirmPassword('');
   };
 
   const handleLogout = () => {
@@ -62,31 +36,6 @@ export default function AccountSettingsScreen() {
           }
         }
       ]
-    );
-  };
-
-  const handleDeleteAccount = () => {
-    Alert.alert(
-      'Delete Account',
-      'This action cannot be undone. All your data will be permanently deleted.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Delete', 
-          style: 'destructive',
-          onPress: () => {
-            Alert.alert('Account Deleted', 'Your account has been permanently deleted.');
-          }
-        }
-      ]
-    );
-  };
-
-  const handleDownloadData = () => {
-    Alert.alert(
-      'Download Data',
-      'We will prepare your data and send it to your email address within 24 hours.',
-      [{ text: 'OK' }]
     );
   };
 
@@ -163,87 +112,18 @@ export default function AccountSettingsScreen() {
           </View>
         </View>
 
-        {/* Password & Security */}
+        {/* Account Actions */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Password & Security</Text>
+          <Text style={styles.sectionTitle}>Account Actions</Text>
           <View style={styles.sectionContent}>
-            <View style={styles.passwordSection}>
-              <Text style={styles.passwordTitle}>Change Password</Text>
-              
-              <View style={styles.inputContainer}>
-                <Text style={styles.inputLabel}>Current Password</Text>
-                <View style={styles.passwordInput}>
-                  <TextInput
-                    style={styles.textInput}
-                    value={currentPassword}
-                    onChangeText={setCurrentPassword}
-                    secureTextEntry={!showPassword}
-                    placeholder="Enter current password"
-                  />
-                  <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
-                    {showPassword ? (
-                      <EyeOff size={20} color="#666" />
-                    ) : (
-                      <Eye size={20} color="#666" />
-                    )}
-                  </TouchableOpacity>
-                </View>
-              </View>
-              
-              <View style={styles.inputContainer}>
-                <Text style={styles.inputLabel}>New Password</Text>
-                <TextInput
-                  style={styles.textInput}
-                  value={newPassword}
-                  onChangeText={setNewPassword}
-                  secureTextEntry={true}
-                  placeholder="Enter new password"
-                />
-              </View>
-              
-              <View style={styles.inputContainer}>
-                <Text style={styles.inputLabel}>Confirm New Password</Text>
-                <TextInput
-                  style={styles.textInput}
-                  value={confirmPassword}
-                  onChangeText={setConfirmPassword}
-                  secureTextEntry={true}
-                  placeholder="Confirm new password"
-                />
-              </View>
-              
-              <TouchableOpacity style={styles.changePasswordButton} onPress={handleChangePassword}>
-                <Text style={styles.changePasswordText}>Change Password</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-
-        {/* Privacy & Data */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Privacy & Data</Text>
-          <View style={styles.sectionContent}>
-            <TouchableOpacity style={styles.actionItem} onPress={handleDownloadData}>
+            <TouchableOpacity style={styles.actionItem} onPress={handleLogout}>
               <View style={styles.actionLeft}>
                 <View style={styles.iconContainer}>
-                  <Download size={20} color="#4CAF50" />
+                  <LogOut size={20} color="#FF9800" />
                 </View>
                 <View>
-                  <Text style={styles.actionLabel}>Download My Data</Text>
-                  <Text style={styles.actionDescription}>Get a copy of your data</Text>
-                </View>
-              </View>
-              <ChevronRight size={16} color="#999" />
-            </TouchableOpacity>
-            
-            <TouchableOpacity style={styles.actionItem}>
-              <View style={styles.actionLeft}>
-                <View style={styles.iconContainer}>
-                  <Shield size={20} color="#2196F3" />
-                </View>
-                <View>
-                  <Text style={styles.actionLabel}>Privacy Policy</Text>
-                  <Text style={styles.actionDescription}>Read our privacy policy</Text>
+                  <Text style={styles.actionLabel}>Logout</Text>
+                  <Text style={styles.actionDescription}>Sign out of your account</Text>
                 </View>
               </View>
               <ChevronRight size={16} color="#999" />
@@ -263,19 +143,6 @@ export default function AccountSettingsScreen() {
                 <View>
                   <Text style={styles.actionLabel}>Logout</Text>
                   <Text style={styles.actionDescription}>Sign out of your account</Text>
-                </View>
-              </View>
-              <ChevronRight size={16} color="#999" />
-            </TouchableOpacity>
-            
-            <TouchableOpacity style={styles.actionItem} onPress={handleDeleteAccount}>
-              <View style={styles.actionLeft}>
-                <View style={styles.iconContainer}>
-                  <Trash2 size={20} color="#F44336" />
-                </View>
-                <View>
-                  <Text style={[styles.actionLabel, { color: '#F44336' }]}>Delete Account</Text>
-                  <Text style={styles.actionDescription}>Permanently delete your account</Text>
                 </View>
               </View>
               <ChevronRight size={16} color="#999" />

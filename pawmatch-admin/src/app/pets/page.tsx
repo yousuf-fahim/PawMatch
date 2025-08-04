@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { createClient } from '@supabase/supabase-js'
+import Image from 'next/image'
 import { 
   PawPrint, 
   Plus, 
@@ -13,8 +14,7 @@ import {
   Trash2,
   Eye,
   ArrowLeft,
-  Check,
-  X
+  Check
 } from 'lucide-react'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -53,9 +53,27 @@ export default function PetsManagementPage() {
     }
   }, [user, loading, isAdmin, router])
 
+  const filterPets = useCallback(() => {
+    let filtered = pets
+
+    if (searchTerm) {
+      filtered = filtered.filter(pet => 
+        pet.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        pet.breed.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        pet.location.toLowerCase().includes(searchTerm.toLowerCase())
+      )
+    }
+
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(pet => pet.adoption_status === statusFilter)
+    }
+
+    setFilteredPets(filtered)
+  }, [pets, searchTerm, statusFilter])
+
   useEffect(() => {
     filterPets()
-  }, [pets, searchTerm, statusFilter])
+  }, [filterPets])
 
   const loadPets = async () => {
     try {
@@ -72,24 +90,6 @@ export default function PetsManagementPage() {
     } finally {
       setLoadingPets(false)
     }
-  }
-
-  const filterPets = () => {
-    let filtered = pets
-
-    if (searchTerm) {
-      filtered = filtered.filter(pet => 
-        pet.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        pet.breed.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        pet.location.toLowerCase().includes(searchTerm.toLowerCase())
-      )
-    }
-
-    if (statusFilter !== 'all') {
-      filtered = filtered.filter(pet => pet.adoption_status === statusFilter)
-    }
-
-    setFilteredPets(filtered)
   }
 
   const updatePetStatus = async (petId: string, newStatus: string) => {
@@ -314,10 +314,12 @@ export default function PetsManagementPage() {
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
                           <div className="flex-shrink-0 h-12 w-12">
-                            <img
+                            <Image
                               className="h-12 w-12 rounded-full object-cover"
-                              src={pet.images[0] || '/api/placeholder/48/48'}
+                              src={pet.images[0] || '/placeholder-pet.png'}
                               alt={pet.name}
+                              width={48}
+                              height={48}
                             />
                           </div>
                           <div className="ml-4">
@@ -352,7 +354,7 @@ export default function PetsManagementPage() {
                             <Eye className="w-4 h-4" />
                           </button>
                           <button
-                            onClick={() => {}}
+                            onClick={() => router.push(`/pets/edit/${pet.id}`)}
                             className="text-blue-400 hover:text-blue-600 p-1"
                             title="Edit Pet"
                           >

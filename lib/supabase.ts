@@ -1,7 +1,31 @@
 import { createClient } from '@supabase/supabase-js'
+import * as AuthSession from 'expo-auth-session'
 
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY
+
+// Helper function to get the appropriate redirect URI
+const getRedirectUri = () => {
+  if (__DEV__) {
+    // Development environment - use Expo development URL
+    return AuthSession.makeRedirectUri({})
+  } else {
+    // Production environment - use app scheme
+    return AuthSession.makeRedirectUri({ 
+      scheme: 'pawmatch',
+      path: 'auth/callback'
+    })
+  }
+}
+
+// Debug logging for redirect URIs (only in development)
+if (__DEV__ && process.env.EXPO_PUBLIC_DEBUG_AUTH === 'true') {
+  console.log('\n📋 [Google Console] Add these Redirect URIs:');
+  console.log('- Development (Expo Go):', AuthSession.makeRedirectUri({}));
+  console.log('- Alternative Dev:', 'https://auth.expo.io/@yousuf_fahim/pawmatch');
+  console.log('- Production (EAS Build):', AuthSession.makeRedirectUri({ scheme: 'pawmatch', path: 'auth/callback' }));
+  console.log('- Alternative Production:', 'pawmatch://auth/callback');
+}
 
 // Check if environment variables are configured and create client
 let supabaseClient: ReturnType<typeof createClient> | null = null
@@ -74,55 +98,6 @@ export interface LearningArticle {
   updated_at: string
 }
 
-export interface Notification {
-  id: string
-  user_id: string
-  type: 'adoption_approved' | 'adoption_rejected' | 'adoption_pending' | 'message' | 'system'
-  title: string
-  message: string
-  pet_id?: string
-  pet_name?: string
-  pet_image?: string
-  read: boolean
-  created_at: string
-  updated_at: string
-}
-
-export interface AdoptionApplication {
-  id: string
-  user_id: string
-  pet_id: string
-  status: 'pending' | 'approved' | 'rejected' | 'withdrawn'
-  application_message?: string
-  admin_notes?: string
-  submitted_at: string
-  processed_at?: string
-  processed_by?: string
-}
-
-export interface UserMessage {
-  id: string
-  application_id: string
-  sender_id: string
-  receiver_id: string
-  message: string
-  read: boolean
-  sent_at: string
-}
-
-export interface AdminStats {
-  available_pets: number
-  adopted_pets: number
-  pending_pets: number
-  total_users: number
-  published_articles: number
-  pending_applications: number
-  approved_applications: number
-  unread_notifications: number
-  new_pets_this_month: number
-  new_applications_this_month: number
-}
-
 export interface PetFavorite {
   id: string
   user_id: string
@@ -145,10 +120,20 @@ export const authService = {
       throw new Error('Supabase not configured. Please set up your environment variables.')
     }
     
+    const redirectUri = getRedirectUri()
+    
+    if (__DEV__ && process.env.EXPO_PUBLIC_DEBUG_AUTH === 'true') {
+      console.log('🚀 [Auth] Starting Google sign-in with redirect:', redirectUri)
+    }
+    
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: 'pawmatch://auth/callback', // Update with your app scheme
+        redirectTo: redirectUri,
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'consent',
+        },
       },
     })
     
@@ -437,195 +422,6 @@ export const databaseService = {
     }
     
     return (data as unknown as LearningArticle[]) || []
-  },
-
-  async searchArticles(query: string): Promise<LearningArticle[]> {
-    if (!supabase) return []
-    
-    const { data, error } = await supabase
-      .from('learning_articles')
-      .select('*')
-      .eq('published', true)
-      .or(`title.ilike.%${query}%,content.ilike.%${query}%,excerpt.ilike.%${query}%,tags.cs.{${query}}`)
-      .order('created_at', { ascending: false })
-    
-    if (error) {
-      console.error('Error searching articles:', error)
-      return []
-    }
-    
-    return (data as unknown as LearningArticle[]) || []
-  },
-
-  // Notifications functions
-  async getUserNotifications(userId: string): Promise<Notification[]> {
-    if (!supabase) return []
-    
-    const { data, error } = await supabase
-      .from('notifications')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false })
-    
-    if (error) {
-      console.error('Error fetching notifications:', error)
-      return []
-    }
-    
-    return (data as unknown as Notification[]) || []
-  },
-
-  async markNotificationAsRead(notificationId: string): Promise<boolean> {
-    if (!supabase) return false
-    
-    const { error } = await supabase
-      .from('notifications')
-      .update({ read: true })
-      .eq('id', notificationId)
-    
-    if (error) {
-      console.error('Error marking notification as read:', error)
-      return false
-    }
-    
-    return true
-  },
-
-  async createNotification(notification: Omit<Notification, 'id' | 'created_at' | 'updated_at'>): Promise<Notification | null> {
-    if (!supabase) return null
-    
-    const { data, error } = await supabase
-      .from('notifications')
-      .insert(notification)
-      .select()
-      .single()
-    
-    if (error) {
-      console.error('Error creating notification:', error)
-      return null
-    }
-    
-    return data as unknown as Notification
-  },
-
-  // Adoption applications functions
-  async submitAdoptionApplication(userId: string, petId: string, message: string): Promise<AdoptionApplication | null> {
-    if (!supabase) return null
-    
-    const { data, error } = await supabase
-      .from('adoption_applications')
-      .insert({
-        user_id: userId,
-        pet_id: petId,
-        application_message: message,
-        status: 'pending'
-      })
-      .select()
-      .single()
-    
-    if (error) {
-      console.error('Error submitting adoption application:', error)
-      return null
-    }
-    
-    return data as unknown as AdoptionApplication
-  },
-
-  async getUserApplications(userId: string): Promise<AdoptionApplication[]> {
-    if (!supabase) return []
-    
-    const { data, error } = await supabase
-      .from('adoption_applications')
-      .select(`
-        *,
-        pets (
-          id,
-          name,
-          images,
-          breed,
-          age
-        )
-      `)
-      .eq('user_id', userId)
-      .order('submitted_at', { ascending: false })
-    
-    if (error) {
-      console.error('Error fetching user applications:', error)
-      return []
-    }
-    
-    return (data as unknown as AdoptionApplication[]) || []
-  },
-
-  async updateApplicationStatus(applicationId: string, status: string, adminNotes?: string): Promise<boolean> {
-    if (!supabase) return false
-    
-    const updateData: any = {
-      status,
-      processed_at: new Date().toISOString()
-    }
-    
-    if (adminNotes) {
-      updateData.admin_notes = adminNotes
-    }
-    
-    const { error } = await supabase
-      .from('adoption_applications')
-      .update(updateData)
-      .eq('id', applicationId)
-    
-    if (error) {
-      console.error('Error updating application status:', error)
-      return false
-    }
-    
-    return true
-  },
-
-  // Admin functions
-  async getAdminStats(): Promise<AdminStats | null> {
-    if (!supabase) return null
-    
-    const { data, error } = await supabase
-      .from('admin_stats')
-      .select('*')
-      .single()
-    
-    if (error) {
-      console.error('Error fetching admin stats:', error)
-      return null
-    }
-    
-    return data as unknown as AdminStats
-  },
-
-  async getAllApplications(): Promise<AdoptionApplication[]> {
-    if (!supabase) return []
-    
-    const { data, error } = await supabase
-      .from('adoption_applications')
-      .select(`
-        *,
-        pets (
-          id,
-          name,
-          images,
-          breed,
-          age
-        ),
-        user_profiles!adoption_applications_user_id_fkey (
-          full_name,
-          email
-        )
-      `)
-      .order('submitted_at', { ascending: false })
-    
-    if (error) {
-      console.error('Error fetching all applications:', error)
-      return []
-    }
-    
-    return (data as unknown as AdoptionApplication[]) || []
   }
 }
 

@@ -4,7 +4,9 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { ArrowLeft, Heart, X, MapPin, Star, Calendar, Ruler, Phone, Mail, Share } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { mockPets } from '@/data/pets';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { databaseService, supabase, Pet } from '@/lib/supabase';
+import AnimatedLoader from '@/components/AnimatedLoader';
 
 const { width, height } = Dimensions.get('window');
 
@@ -13,9 +15,69 @@ export default function PetDetailsScreen() {
   const { id, isLiked: initialLiked } = useLocalSearchParams();
   const [isLiked, setIsLiked] = useState(initialLiked === 'true');
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [pet, setPet] = useState<Pet | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  // Find the pet by ID
-  const pet = mockPets.find(p => p.id === id);
+  useEffect(() => {
+    loadPetDetails();
+  }, [id]);
+
+  const loadPetDetails = async () => {
+    try {
+      setLoading(true);
+      
+      if (supabase) {
+        // Try to load from Supabase first
+        const petData = await databaseService.getPetById(id as string);
+        if (petData) {
+          setPet(petData);
+          setLoading(false);
+          return;
+        }
+      }
+      
+      // Fallback to mock data - transform to match Pet interface
+      const mockPet = mockPets.find(p => p.id === id);
+      if (mockPet) {
+        const transformedPet: Pet = {
+          id: mockPet.id,
+          name: mockPet.name,
+          breed: mockPet.breed,
+          age: parseInt(mockPet.age.split(' ')[0]) || 1,
+          gender: mockPet.gender.toLowerCase() as 'male' | 'female',
+          size: mockPet.size.toLowerCase() as 'small' | 'medium' | 'large',
+          color: 'Mixed',
+          personality: mockPet.personality,
+          description: mockPet.description,
+          images: Array.isArray(mockPet.image) ? mockPet.image : [mockPet.image],
+          location: mockPet.location,
+          contact_info: { phone: '+880-XXX-XXXX', email: 'contact@pawmatch.com' },
+          adoption_status: 'available',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+        setPet(transformedPet);
+      } else {
+        setPet(null);
+      }
+    } catch (error) {
+      console.error('Error loading pet details:', error);
+      setPet(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <AnimatedLoader variant="paws" />
+          <Text style={styles.loadingText}>Loading pet details...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   if (!pet) {
     return (
@@ -31,7 +93,7 @@ export default function PetDetailsScreen() {
   }
 
   // Handle both single image and image array
-  const images = Array.isArray(pet.image) ? pet.image : [pet.image];
+  const images = pet.images;
   const currentImage = images[currentImageIndex];
 
   const handleLike = () => {
@@ -144,8 +206,8 @@ export default function PetDetailsScreen() {
               <Text style={styles.statValue}>{pet.size}</Text>
             </View>
             <View style={styles.statItem}>
-              <Text style={[styles.genderIcon, { color: pet.gender === 'Male' ? '#4ECDC4' : '#FF6B6B' }]}>
-                {pet.gender === 'Male' ? '♂' : '♀'}
+              <Text style={[styles.genderIcon, { color: pet.gender === 'male' ? '#4ECDC4' : '#FF6B6B' }]}>
+                {pet.gender === 'male' ? '♂' : '♀'}
               </Text>
               <Text style={styles.statLabel}>Gender</Text>
               <Text style={styles.statValue}>{pet.gender}</Text>
@@ -532,5 +594,18 @@ const styles = StyleSheet.create({
     opacity: 1,
     borderWidth: 3,
     borderColor: '#FF6B6B',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+  },
+  loadingText: {
+    fontSize: 16,
+    fontFamily: 'Nunito-SemiBold',
+    color: '#666',
+    marginTop: 20,
+    textAlign: 'center',
   },
 });

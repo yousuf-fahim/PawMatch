@@ -1,11 +1,11 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { Heart, Shield, AlertCircle } from 'lucide-react'
 
-export default function LoginPage() {
+function LoginContent() {
   const { user, loading, signInWithGoogle, isAdmin } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -94,7 +94,7 @@ export default function LoginPage() {
           <div>
             <p className="text-blue-700 text-sm font-medium">Restricted Access</p>
             <p className="text-blue-600 text-xs mt-1">
-              Only authorized administrators (fahim.cse.bubt@gmail.com) can access this panel.
+              Only authorized administrators (pawfect.mew@gmail.com) can access this panel.
             </p>
           </div>
         </div>
@@ -140,5 +140,23 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-pink-400 via-red-400 to-orange-400">
+        <div className="bg-white rounded-3xl p-8 shadow-2xl">
+          <div className="flex items-center space-x-2">
+            <Heart className="h-8 w-8 text-pink-500" />
+            <span className="text-2xl font-bold text-gray-800">PawMatch Admin</span>
+          </div>
+          <div className="mt-8 text-center">Loading...</div>
+        </div>
+      </div>
+    }>
+      <LoginContent />
+    </Suspense>
   )
 }
